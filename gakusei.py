@@ -34,7 +34,7 @@ def init_board(size):
         board[row][col] = FENCE
   side = BLACK
   ko = [NONE, NONE]
-  groups = [set(), set()]
+  groups = [[], []]
 
 def print_board():
   '''
@@ -52,7 +52,14 @@ def print_board():
     print()
   print('    ', 'A B C D E F G H J K L M N O P Q R S T'[:width*2-4])
   print('\n     Side to move:', ('BLACK' if side == 1 else 'WHITE'))
-  print('\n')
+  print()
+
+def print_groups():
+  print('     Black groups:')
+  for group in groups[BLACK-1]: print('      ', group)
+  print('\n     White groups:')
+  for group in groups[WHITE-1]: print('      ', group)
+  print()
 
 def count(col, row, color, marks):
   '''
@@ -72,35 +79,38 @@ def count(col, row, color, marks):
     marks[row][col] = ESCAPE
 
 def add_stones(marks, color):
-  global groups
   '''
-  Extracts stone/liberty coordinates and stores them to groups
+  Extracts stone/liberty coordinate pairs and stores them to groups
   '''
-  groups = [set(), set()]
-  stones = set()
-  liberties = set()
+  group = {'stones': [], 'liberties' :[]}
   for row in range(width):
     for col in range(width):
       stone = marks[row][col]
       if stone == FENCE or stone == EMPTY: continue
-      if stone == ESCAPE: liberties.add((col, row))
-      else: stones.add((col, row))
-  groups[color-1].add((frozenset(stones), frozenset(liberties)))
-
+      if stone == ESCAPE: group['liberties'].append((col, row))
+      else: group['stones'].append((col, row))
+  return group
 
 def update_groups():
+  global groups
   '''
   Keeps track of BLACK and WHITE groups on board by
   maintaining coordinates of stones and their liberties
   '''
-  marks = [[EMPTY for _ in range(width)] for _ in range(width)]
+  groups = [[], []]
   for row in range(width):
     for col in range(width):
       stone = board[row][col]
       if stone == FENCE or stone == EMPTY: continue
-      count(col, row, BLACK, marks)
-      add_stones(marks, BLACK)
-  [print(i) for i in marks]
+      marks = [[EMPTY for _ in range(width)] for _ in range(width)]
+      if stone == BLACK:
+        count(col, row, BLACK, marks)
+        group = add_stones(marks, BLACK)
+        if group not in groups[BLACK-1]: groups[BLACK-1].append(group)
+      if stone == WHITE:
+        count(col, row, WHITE, marks)
+        group = add_stones(marks, WHITE)
+        if group not in groups[WHITE-1]: groups[WHITE-1].append(group)
 
 init_board(9)
 board = [
@@ -116,6 +126,7 @@ board = [
   [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
   [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
 ]
-print_board()
 update_groups()
 
+print_board()
+print_groups()
