@@ -4,6 +4,8 @@
 #                                                                             #
 ###############################################################################
 
+import sys
+
 # GLOBAL CONSTANTS
 NONE = -1                   # value of not initialized variable
 EMPTY = 0                   # blanc board square value
@@ -16,17 +18,16 @@ ESCAPE = 4                  # liberty mask value
 width = NONE                # board width (9, 13, 19 or other)
 board = [[]]                # board position, two dimensional array
 side = NONE                 # side to move, either BLACK or WHITE
-ko = [NONE, NONE]           # Ko square, cannot place a stone on it
+ko = [NONE, NONE]           # [col, row] Ko square, cannot set a stone on it
 groups = []                 # black and white groups database
 
-def init_board(size):
-  global width, board, side, ko, groups
+def init_board():
+  global board, side, ko, groups
   '''
   Initializes board array of a given size with zeros,
   sets the side to move, resets a Ko square,
   clears groups database
   '''
-  width = size+2 # add offboard squares
   board = [[0 for _ in range(width)] for _ in range(width)]
   for row in range(width):
     for col in range(width):
@@ -53,8 +54,6 @@ def print_board():
   print('    ', 'A B C D E F G H J K L M N O P Q R S T'[:width*2-4])
   print('\n     Side to move:', ('BLACK' if side == 1 else 'WHITE'))
   print()
-
-def print_groups():
   print('     Black groups:')
   for group in groups[BLACK-1]: print('      ', group)
   print('\n     White groups:')
@@ -80,7 +79,7 @@ def count(col, row, color, marks):
 
 def add_stones(marks, color):
   '''
-  Extracts stone/liberty coordinate pairs and stores them to groups
+  Extracts stone/liberty coordinate pairs and stores them as group
   '''
   group = {'stones': [], 'liberties' :[]}
   for row in range(width):
@@ -112,21 +111,71 @@ def update_groups():
         group = add_stones(marks, WHITE)
         if group not in groups[WHITE-1]: groups[WHITE-1].append(group)
 
-init_board(9)
-board = [
-  [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
-  [3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 3],
-  [3, 0, 0, 2, 1, 0, 1, 1, 1, 0, 3],
-  [3, 0, 2, 1, 1, 0, 0, 0, 0, 0, 3],
-  [3, 0, 0, 1, 2, 2, 0, 0, 1, 0, 3],
-  [3, 0, 0, 1, 0, 2, 0, 2, 0, 0, 3],
-  [3, 0, 0, 0, 0, 2, 2, 2, 0, 0, 3],
-  [3, 0, 0, 0, 0, 2, 0, 2, 0, 0, 3],
-  [3, 0, 0, 0, 0, 2, 2, 2, 0, 0, 3],
-  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-  [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
-]
-update_groups()
+def play(col, row, color):
+  global ko, side
+  '''
+  Sets stone of a given color at col, row,
+  handles captures, sets new Ko square when needed,
+  return true if move is legal and false otherwise
+  '''
+  ko = [NONE, NONE]
+  board[row][col] = color
+  update_groups()
+  for group in groups[(3-color-1)]:
+    if len(group['liberties']) == 0:
+      for stone in group['stones']:
+        board[stone[1]][stone[0]] = EMPTY
+  side = (3-color)
 
-print_board()
-print_groups()
+def gtp():
+  global width, side
+  while True:
+    command = input()
+    if 'name' in command: print('= Gakusei\n')
+    elif 'protocol_version' in command: print('= 1\n');
+    elif 'version' in command: print('=', 'by Code Monkey King\n')
+    elif 'list_commands' in command: print('= protocol_version\n')
+    elif 'boardsize' in command: width = int(command.split()[1])+2; print('=\n')
+    elif 'clear_board' in command: init_board(); print('=\n')
+    elif 'showboard' in command: print('= Internal board:', end=''); print_board()
+    elif 'play' in command:
+      if 'pass' not in command:
+        params = command.split()
+        color = BLACK if params[1] == 'B' else WHITE
+        col = ord(params[2][0])-ord('A')+(1 if ord(params[2][0]) <= ord('H') else 0)
+        row = width-int(params[2][1:])-1
+        play(col, row, color)
+        print('=\n')
+      else:
+        side = (3-side)
+        print('=\n')
+    #elif 'genmove' in command: print('=', genmove(BLACK if command.split()[-1] == 'B' else WHITE) + '\n')
+    elif 'quit' in command: sys.exit()
+    else: print('=\n') # skip currently unsupported commands
+
+def debug():
+  init_board()
+  board = [
+    [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
+    [3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 3],
+    [3, 0, 0, 2, 1, 0, 1, 1, 1, 0, 3],
+    [3, 0, 2, 1, 1, 0, 0, 0, 0, 0, 3],
+    [3, 0, 0, 1, 2, 2, 0, 0, 1, 0, 3],
+    [3, 0, 0, 1, 0, 2, 0, 2, 0, 0, 3],
+    [3, 0, 0, 0, 0, 2, 2, 2, 0, 0, 3],
+    [3, 0, 0, 0, 0, 2, 1, 2, 0, 0, 3],
+    [3, 0, 0, 0, 0, 2, 1, 2, 0, 0, 3],
+    [3, 0, 0, 0, 0, 0, 2, 0, 0, 0, 3],
+    [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
+  ]
+  update_groups()
+  play(2,2, BLACK)
+  print_board()
+
+def main():
+  global width
+  width=19+2;   # set board width + offboard squares
+  init_board(); # set up board
+  gtp()         # start GTP IO communication
+
+main()
