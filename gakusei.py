@@ -144,6 +144,16 @@ def play(col, row, color):
         board[stone[1]][stone[0]] = EMPTY
   side = (3-color)
 
+def genmove(color):
+  '''
+  Returns the best move to be played by the given color
+  by considering the following heuristics:
+
+  
+
+  '''
+  print(color)
+
 def gtp():
   global width, side
   while True:
@@ -166,7 +176,10 @@ def gtp():
       else:
         side = (3-side)
         print('=\n')
-    #elif 'genmove' in command: print('=', genmove(BLACK if command.split()[-1] == 'B' else WHITE) + '\n')
+    elif 'genmove' in command:
+      best_move = genmove(BLACK if command.split()[-1] == 'B' else WHITE)
+      print('=\n')
+      #print('=', best_move, '\n')
     elif 'quit' in command: sys.exit()
     else: print('=\n') # skip currently unsupported commands
 
