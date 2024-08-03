@@ -54,6 +54,8 @@ def print_board():
   print('   ', 'A B C D E F G H J K L M N O P Q R S T'[:width*2-4])
   print('\n    Side to move:', ('BLACK' if side == 1 else 'WHITE'))
   print()
+
+def print_groups():
   print('    Black groups:')
   for group in groups[BLACK-1]: print('      ', group)
   print('\n    White groups:')
@@ -127,6 +129,16 @@ def is_clover(col, row):
     elif stone == other_color: return EMPTY
   return clover_color
 
+def is_suicide(col, row, color):
+  suicide = False
+  board[row][col] = color
+  marks = [[EMPTY for _ in range(width)] for _ in range(width)]
+  count(col, row, color, marks)
+  group = add_stones(marks, color)
+  if len(group['liberties']) == 0: suicide = True
+  board[row][col] = EMPTY
+  return suicide
+
 def play(col, row, color):
   global ko, side
   '''
@@ -139,20 +151,88 @@ def play(col, row, color):
   for group in groups[(3-color-1)]:
     if len(group['liberties']) == 0:
       if len(group['stones']) == 1 and is_clover(col, row) == (3-side):
-        ko = [group['stones'][0][0], group['stones'][0][1]]
+        ko = group['stones'][0]
       for stone in group['stones']:
         board[stone[1]][stone[0]] = EMPTY
   side = (3-color)
 
+def attack(group, color):
+  '''
+  Returns the best move to attack a given group
+  '''
+  urgency = (len(group['stones']) / len(group['liberties']))
+  if len(group['liberties'])== 1: # capture group
+    urgency *= 4
+    if group['liberties'][0] != ko:
+      return [group['liberties'][0], urgency]
+  if len(group['liberties']) > 1: # surround group
+    for move in group['liberties']: # TODO: find best attack
+      if not is_suicide(move[0], move[1], color):
+        urgency *= 2
+        return [move, urgency]
+  return NONE
+
+def defend(group, color):
+  '''
+  Returns the best move to defend a given group
+  '''
+  urgency = (len(group['stones']) / len(group['liberties']))
+  if len(group['liberties'])== 1: # save group
+    urgency *= 3
+    if not is_suicide(group['liberties'][0][0], group['liberties'][0][1], color):
+      return [group['liberties'][0], urgency]
+  if len(group['liberties']) > 1: # extend group
+    for move in group['liberties']: # TODO: find best save
+      if not is_suicide(move[0], move[1], color):
+        return [move, urgency]
+  return NONE
+
 def genmove(color):
   '''
-  Returns the best move to be played by the given color
-  by considering the following heuristics:
+  Returns the best move to be played by the given
+  color, considering the following heuristics:
 
-  
+  1. ATTACK OPPONENT'S GROUP
+  2. DEFEND OWN GROUP
+  3. MATCH PATTERNS
 
+  There might be several attacking moves, several
+  defensive ones and a few pattern matches. Each
+  move gets assigned the value of its "urgency".
+  For a contact play (attack/defense) "urgency" is
+  calculated via dividing the number of stones by
+  the amount of liberties, the higher value we have
+  the more urgent a given move is.
+
+  For pattern matching
+  "urgency" is assigned with...
+
+  Eventually
+  a move with the biggest urgency is considered to be
+  the best.
   '''
-  print(color)
+  
+  # First we need to get all attacking moves,
+  # so we loop over opponent's group and call
+  # attack(group) to return the best attacking
+  # move with associated urgency.
+  update_groups()
+  moves = []
+  for group in groups[(3-color-1)]: # attack opponent's weakest group
+    move = attack(group, color)
+    if move != NONE and move not in moves:
+      moves.append(move)
+  
+  for group in groups[(color-1)]: # defend own weakest group
+    move = defend(group, color)
+    if move != NONE and move not in moves:
+      moves.append(move)
+  
+  # Sort moves in place by urgency in descending order
+  if len(moves):
+    moves.sort(key=lambda x: x[1], reverse=True)
+    return moves[0][0]
+  return NONE
 
 def gtp():
   global width, side
@@ -177,9 +257,14 @@ def gtp():
         side = (3-side)
         print('=\n')
     elif 'genmove' in command:
-      best_move = genmove(BLACK if command.split()[-1] == 'B' else WHITE)
-      print('=\n')
-      #print('=', best_move, '\n')
+      color = BLACK if command.split()[-1] == 'B' else WHITE
+      best_move = genmove(color)
+      if best_move != NONE:
+        play(best_move[0], best_move[1], color)
+        col = chr(best_move[0]-(1 if best_move[0]<=8 else 0)+ord('A'))
+        row = str(width-best_move[1]-1)
+        print('= ' + col + row + '\n')
+      else: print('= pass\n')
     elif 'quit' in command: sys.exit()
     else: print('=\n') # skip currently unsupported commands
 
@@ -189,19 +274,19 @@ def debug():
   init_board()
   board = [
     [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
-    [3, 0, 2, 0, 1, 0, 0, 0, 0, 0, 3],
-    [3, 2, 0, 2, 1, 0, 1, 1, 1, 0, 3],
-    [3, 0, 2, 1, 1, 0, 0, 0, 0, 0, 3],
-    [3, 0, 0, 1, 2, 2, 0, 0, 1, 0, 3],
-    [3, 0, 0, 1, 0, 2, 0, 2, 0, 0, 3],
-    [3, 0, 0, 0, 0, 2, 2, 2, 0, 0, 3],
-    [3, 0, 0, 0, 0, 2, 1, 2, 0, 0, 3],
-    [3, 0, 0, 0, 0, 2, 1, 2, 0, 0, 3],
-    [3, 0, 0, 0, 0, 0, 2, 0, 0, 0, 3],
+    [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+    [3, 0, 0, 1, 1, 0, 0, 0, 0, 0, 3],
+    [3, 0, 1, 2, 0, 1, 0, 0, 0, 0, 3],
+    [3, 0, 0, 1, 1, 0, 0, 0, 0, 0, 3],
+    [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+    [3, 0, 0, 1, 1, 1, 0, 0, 0, 0, 3],
+    [3, 0, 1, 2, 2, 2, 0, 0, 0, 0, 3],
+    [3, 0, 0, 1, 1, 1, 0, 0, 0, 0, 3],
+    [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
     [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
   ]
   print_board()
-  print(is_clover(1,1))
+  print(is_suicide(4,3, BLACK))
 
 def main():
   global width
