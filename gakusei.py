@@ -46,17 +46,17 @@ def print_board():
     for col in range(width):
       if col == 0 and row != 0 and row != width-1:
         rown = width-row-1
-        print((' ' if rown < 10 else ''), rown, end='  ')
+        print((' ' if rown < 10 else ''), rown, end=' ')
       if board[row][col] == FENCE: continue
-      if row == ko[0] and col == ko[1]: print('#', end=' ')
+      if col == ko[0] and row == ko[1]: print('#', end=' ')
       else: print(['.', 'X', 'O', '#'][board[row][col]], end=' ')
-    print()
-  print('    ', 'A B C D E F G H J K L M N O P Q R S T'[:width*2-4])
-  print('\n     Side to move:', ('BLACK' if side == 1 else 'WHITE'))
+    if row < width-1: print()
+  print('   ', 'A B C D E F G H J K L M N O P Q R S T'[:width*2-4])
+  print('\n    Side to move:', ('BLACK' if side == 1 else 'WHITE'))
   print()
-  print('     Black groups:')
+  print('    Black groups:')
   for group in groups[BLACK-1]: print('      ', group)
-  print('\n     White groups:')
+  print('\n    White groups:')
   for group in groups[WHITE-1]: print('      ', group)
   print()
 
@@ -111,18 +111,35 @@ def update_groups():
         group = add_stones(marks, WHITE)
         if group not in groups[WHITE-1]: groups[WHITE-1].append(group)
 
+def is_clover(col, row):
+  '''
+  Returns color of clover shape surrounding current square
+  or EMPTY if this is not a clover shape
+  '''
+  clover_color = -1
+  other_color = -1
+  for stone in [board[row][col+1], board[row][col-1], board[row+1][col], board[row-1][col]]:
+    if stone == FENCE: continue
+    if stone == EMPTY: return EMPTY
+    if clover_color == -1:
+      clover_color = stone
+      other_color = (3-clover_color)
+    elif stone == other_color: return EMPTY
+  return clover_color
+
 def play(col, row, color):
   global ko, side
   '''
   Sets stone of a given color at col, row,
-  handles captures, sets new Ko square when needed,
-  return true if move is legal and false otherwise
+  handles captures, sets new Ko square when needed.
   '''
   ko = [NONE, NONE]
   board[row][col] = color
   update_groups()
   for group in groups[(3-color-1)]:
     if len(group['liberties']) == 0:
+      if len(group['stones']) == 1 and is_clover(col, row) == (3-side):
+        ko = [group['stones'][0][0], group['stones'][0][1]]
       for stone in group['stones']:
         board[stone[1]][stone[0]] = EMPTY
   side = (3-color)
@@ -154,11 +171,13 @@ def gtp():
     else: print('=\n') # skip currently unsupported commands
 
 def debug():
+  global width, board
+  width=9+2
   init_board()
   board = [
     [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
-    [3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 3],
-    [3, 0, 0, 2, 1, 0, 1, 1, 1, 0, 3],
+    [3, 0, 2, 0, 1, 0, 0, 0, 0, 0, 3],
+    [3, 2, 0, 2, 1, 0, 1, 1, 1, 0, 3],
     [3, 0, 2, 1, 1, 0, 0, 0, 0, 0, 3],
     [3, 0, 0, 1, 2, 2, 0, 0, 1, 0, 3],
     [3, 0, 0, 1, 0, 2, 0, 2, 0, 0, 3],
@@ -168,9 +187,8 @@ def debug():
     [3, 0, 0, 0, 0, 0, 2, 0, 0, 0, 3],
     [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
   ]
-  update_groups()
-  play(2,2, BLACK)
   print_board()
+  print(is_clover(1,1))
 
 def main():
   global width
@@ -178,4 +196,5 @@ def main():
   init_board(); # set up board
   gtp()         # start GTP IO communication
 
+#debug()
 main()
