@@ -224,10 +224,9 @@ def attack(group, color):
   Returns the best move to attack a given group
   '''
   moves = []
-  urgency = int(len(group['stones']) / len(group['liberties']))
   if len(group['liberties'])== 1: # capture group
-    urgency *= (width*20)
     if group['liberties'][0] != ko:
+      urgency = calculate_urgency('capture', group, group['liberties'][0])
       return [group['liberties'][0], urgency, 'capture']
   if len(group['liberties']) == 2: # check ladder attack
     stone = group['stones'][0]
@@ -235,16 +234,14 @@ def attack(group, color):
     if move:
       if not is_suicide(move[0], move[1], color):
         if not is_atari(move[0], move[1], color):
-          urgency = (width*2)
-          return [move, urgency, 'capture ladder']
-  if len(group['liberties']) > 2: # surround group
+          urgency = calculate_urgency('ladder', group, move)
+          return [move, urgency, 'ladder_attack']
+  if len(group['liberties']) >= 2: # surround group
     for move in group['liberties']:
       if not is_suicide(move[0], move[1], color):
-        urgency = (abs(int(width/2) - move[0]) + abs(int(width/2) - move[1]))*5
-        if (move[0] == 1 or move[1] == 1 or
-            move[0] == (width-2) or move[1] == (width-2)):
-            urgency = 3
+        urgency = calculate_urgency('surround', group, move)
         if is_atari(move[0], move[1], color): continue
+        print('candidate surround:', move_to_string(move), urgency, file=sys.stderr)
         moves.append([move, urgency, 'surround'])
     if len(moves):
       moves.sort(key=lambda x: x[1])
@@ -258,13 +255,8 @@ def defend(group, color):
   moves = []
   urgency = int(len(group['stones']) / len(group['liberties']))
   if len(group['liberties'])== 1: # save group
-    urgency *= (width*3)
-    if (group['liberties'][0][0] == 1 or
-        group['liberties'][0][1] == 1 or
-        group['liberties'][0][0] == (width-2) or
-        group['liberties'][0][1] == (width-2)):
-        urgency = 2
     if not is_suicide(group['liberties'][0][0], group['liberties'][0][1], color):
+      urgency = calculate_urgency('save', group, group['liberties'][0])
       stone = group['stones'][0]
       ladder = check_ladder(stone[0], stone[1], color) # check if not trapped int a ladder
       if not ladder: return [group['liberties'][0], urgency, 'save']
@@ -272,15 +264,27 @@ def defend(group, color):
     for move in group['liberties']:
       if not is_suicide(move[0], move[1], color):
         if not is_clover(move[0], move[1]):
-          urgency = (abs(int(width/2) - move[0]) + abs(int(width/2) - move[1]))
-          if (move[0] < 3 or move[1] < 3 or
-              move[0] < (width-5) or move[1] < (width-5)):
-              urgency = 1 # crawling on 1st and 2nd lines is bad
+          urgency = calculate_urgency('extend', group, move)
           moves.append([move, urgency, 'extend'])
     if len(moves):
       moves.sort(key=lambda x: x[1], reverse=True)
       return moves[0]
   return NONE
+
+def calculate_urgency(move_type, group, move):
+  '''
+  Returns urgency value based on group size
+  and amount of its liberties, move type and location
+  '''
+  urgency = int(len(group['stones']) / len(group['liberties']))
+  center = (width // 2, width // 2)
+  distance = abs(move[0] - center[0]) + abs(move[1] - center[1])
+  if move_type == 'capture': urgency += (width*30)
+  elif move_type == 'surround': urgency += ((width*20)+distance)
+  elif move_type == 'ladder': urgency += (width*25)
+  elif move_type == 'save': urgency += ((width*30)-distance)
+  elif move_type == 'extend': urgency += ((width*20)-distance)
+  return urgency
 
 def genmove(color):
   '''
