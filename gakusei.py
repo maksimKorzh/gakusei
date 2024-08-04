@@ -5,6 +5,7 @@
 ###############################################################################
 
 import sys
+import copy
 
 # GLOBAL CONSTANTS
 NONE = -1                   # value of not initialized variable
@@ -92,6 +93,14 @@ def add_stones(marks, color):
       else: group['stones'].append((col, row))
   return group
 
+def make_group(col, row, color):
+  '''
+  Returns a group of a given color at col, row
+  '''
+  marks = [[EMPTY for _ in range(width)] for _ in range(width)]
+  count(col, row, color, marks)
+  return add_stones(marks, color)
+
 def update_groups():
   global groups
   '''
@@ -103,14 +112,12 @@ def update_groups():
     for col in range(width):
       stone = board[row][col]
       if stone == FENCE or stone == EMPTY: continue
-      marks = [[EMPTY for _ in range(width)] for _ in range(width)]
+
       if stone == BLACK:
-        count(col, row, BLACK, marks)
-        group = add_stones(marks, BLACK)
+        group = make_group(col, row, BLACK)
         if group not in groups[BLACK-1]: groups[BLACK-1].append(group)
       if stone == WHITE:
-        count(col, row, WHITE, marks)
-        group = add_stones(marks, WHITE)
+        group = make_group(col, row, WHITE)
         if group not in groups[WHITE-1]: groups[WHITE-1].append(group)
 
 def is_clover(col, row):
@@ -177,6 +184,45 @@ def play(col, row, color):
         board[stone[1]][stone[0]] = EMPTY
   side = (3-color)
 
+def is_ladder(col, row, color):
+  '''
+  Resursively simulates a ladder chasing and
+  figures out whether it works or not
+  '''
+  input()
+  group = make_group(col, row, color)
+  print('liberties', len(group['liberties']))
+  print_board()
+  if len(group['liberties']) == 0:
+    return True    
+  if len(group['liberties']) == 1:
+    board[row][col] = color
+    new_col = group['liberties'][0][0]
+    new_row = group['liberties'][0][1]
+    if is_ladder(new_col, new_row, color): return True
+    board[row][col] = EMPTY
+  if len(group['liberties']) == 2:
+    for move in group['liberties']:
+      board[move[1]][move[0]] = (3-color)
+      group = make_group(col, row, color)
+      new_col = group['liberties'][0][0]
+      new_row = group['liberties'][0][1]
+      if is_ladder(new_col, new_row, color): return True
+      board[move[1]][move[0]] = EMPTY
+  return False
+
+def check_ladder(col, row, color):
+  global board
+  '''
+  Return true if ladder is working and false otherwise,
+  initial group to check should contain 2 liberties
+  '''
+  current_board = copy.deepcopy(board)
+  ladder = is_ladder(col, row, color)
+  board = copy.deepcopy(current_board)
+  return ladder
+
+
 def attack(group, color):
   '''
   Returns the best move to attack a given group
@@ -187,8 +233,9 @@ def attack(group, color):
     urgency *= (width*20)
     if group['liberties'][0] != ko:
       return [group['liberties'][0], urgency, 'capture']
+  # TODO: ladder attack
   if len(group['liberties']) > 1: # surround group
-    for move in group['liberties']: # TODO: find best attack
+    for move in group['liberties']:
       if not is_suicide(move[0], move[1], color):
         urgency = (abs(int(width/2) - move[0]) + abs(int(width/2) - move[1]))*3
         if (move[0] == 1 or move[1] == 1 or
@@ -216,7 +263,9 @@ def defend(group, color):
         urgency = 1
     if not is_suicide(group['liberties'][0][0], group['liberties'][0][1], color):
       return [group['liberties'][0], urgency, 'save']
-  if len(group['liberties']) > 1: # extend group
+  if len(group['liberties']) == 2: # defend ladder
+    print('defend ladder', file=sys.stderr)
+  if len(group['liberties']) > 2: # extend group
     for move in group['liberties']: # TODO: find best save
       if not is_suicide(move[0], move[1], color):
         if not is_clover(move[0], move[1]):
@@ -321,21 +370,37 @@ def debug():
   global width, board
   width=9+2
   init_board()
+  #board = [
+  #  [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
+  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+  #  [3, 0, 0, 1, 1, 1, 0, 0, 0, 0, 3],
+  #  [3, 0, 1, 2, 2, 0, 0, 0, 0, 0, 3],
+  #  [3, 0, 0, 1, 0, 1, 0, 0, 0, 0, 3],
+  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+  #  [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
+  #]
   board = [
     [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
     [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-    [3, 0, 0, 1, 1, 0, 0, 0, 0, 0, 3],
-    [3, 0, 1, 2, 0, 1, 0, 0, 0, 0, 3],
-    [3, 0, 0, 1, 1, 0, 0, 0, 0, 0, 3],
+    [3, 0, 0, 1, 1, 1, 0, 0, 0, 0, 3],
+    [3, 0, 1, 2, 2, 0, 0, 0, 0, 0, 3],
+    [3, 0, 0, 1, 0, 1, 0, 0, 0, 0, 3],
     [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-    [3, 0, 0, 1, 1, 1, 0, 0, 0, 0, 3],
-    [3, 0, 1, 2, 2, 2, 0, 0, 0, 0, 3],
-    [3, 0, 0, 1, 1, 1, 0, 0, 0, 0, 3],
+    [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+    [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+    [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
     [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
     [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
   ]
+
+  print('ladder', check_ladder(4, 3, WHITE))
   print_board()
-  print(is_suicide(4,3, BLACK))
+  update_groups()
+  print_groups()
 
 def main():
   global width
@@ -343,5 +408,5 @@ def main():
   init_board(); # set up board
   gtp()         # start GTP IO communication
 
-#debug()
-main()
+debug()
+#main()
