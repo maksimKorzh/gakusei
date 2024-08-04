@@ -165,14 +165,12 @@ def is_atari(col, row, color):
   board[row][col] = EMPTY
   return atari
 
-  pass
-
 def play(col, row, color):
-  global ko, side
   '''
   Sets stone of a given color at col, row,
   handles captures, sets new Ko square when needed.
   '''
+  global ko, side
   ko = [NONE, NONE]
   board[row][col] = color
   update_groups()
@@ -189,17 +187,14 @@ def is_ladder(col, row, color):
   Resursively simulates a ladder chasing and
   figures out whether it works or not
   '''
-  input()
   group = make_group(col, row, color)
-  print('liberties', len(group['liberties']))
-  print_board()
   if len(group['liberties']) == 0:
     return True    
   if len(group['liberties']) == 1:
     board[row][col] = color
     new_col = group['liberties'][0][0]
     new_row = group['liberties'][0][1]
-    if is_ladder(new_col, new_row, color): return True
+    if is_ladder(new_col, new_row, color): return 1
     board[row][col] = EMPTY
   if len(group['liberties']) == 2:
     for move in group['liberties']:
@@ -207,16 +202,17 @@ def is_ladder(col, row, color):
       group = make_group(col, row, color)
       new_col = group['liberties'][0][0]
       new_row = group['liberties'][0][1]
-      if is_ladder(new_col, new_row, color): return True
+      if is_ladder(new_col, new_row, color): return move
       board[move[1]][move[0]] = EMPTY
-  return False
+  return 0
+
 
 def check_ladder(col, row, color):
-  global board
   '''
   Return true if ladder is working and false otherwise,
   initial group to check should contain 2 liberties
   '''
+  global board
   current_board = copy.deepcopy(board)
   ladder = is_ladder(col, row, color)
   board = copy.deepcopy(current_board)
@@ -233,8 +229,13 @@ def attack(group, color):
     urgency *= (width*20)
     if group['liberties'][0] != ko:
       return [group['liberties'][0], urgency, 'capture']
-  # TODO: ladder attack
-  if len(group['liberties']) > 1: # surround group
+  if len(group['liberties']) == 2: # check ladder attack
+    stone = group['stones'][0]
+    move = check_ladder(stone[0], stone[1], (3-color))
+    if move:
+      urgency = 40
+      return [move, urgency, 'capture ladder']
+  if len(group['liberties']) > 2: # surround group
     for move in group['liberties']:
       if not is_suicide(move[0], move[1], color):
         urgency = (abs(int(width/2) - move[0]) + abs(int(width/2) - move[1]))*3
@@ -264,7 +265,7 @@ def defend(group, color):
     if not is_suicide(group['liberties'][0][0], group['liberties'][0][1], color):
       return [group['liberties'][0], urgency, 'save']
   if len(group['liberties']) == 2: # defend ladder
-    print('defend ladder', file=sys.stderr)
+    print('should defend ladder...', file=sys.stderr)
   if len(group['liberties']) > 2: # extend group
     for move in group['liberties']: # TODO: find best save
       if not is_suicide(move[0], move[1], color):
@@ -329,12 +330,18 @@ def genmove(color):
   return NONE
 
 def move_to_string(move):
+  '''
+  Converts move (col, row) to algebraic notation
+  '''
   global width
   col = chr(move[0]-(1 if move[0]<=8 else 0)+ord('A'))
   row = str(width-move[1]-1)
   return col+row
 
 def gtp():
+  '''
+  Handles GTP communication between engine and GUI
+  '''
   global width, side
   while True:
     command = input()
@@ -387,8 +394,8 @@ def debug():
     [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
     [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
     [3, 0, 0, 1, 1, 1, 0, 0, 0, 0, 3],
-    [3, 0, 1, 2, 2, 0, 0, 0, 0, 0, 3],
-    [3, 0, 0, 1, 0, 1, 0, 0, 0, 0, 3],
+    [3, 0, 1, 2, 2, 1, 0, 0, 0, 0, 3],
+    [3, 0, 0, 1, 2, 0, 0, 0, 0, 0, 3],
     [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
     [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
     [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
@@ -402,11 +409,13 @@ def debug():
   update_groups()
   print_groups()
 
+  gtp()
+
 def main():
   global width
   width=19+2;   # set board width + offboard squares
   init_board(); # set up board
   gtp()         # start GTP IO communication
 
-debug()
-#main()
+#debug()
+main()
