@@ -233,12 +233,14 @@ def attack(group, color):
     stone = group['stones'][0]
     move = check_ladder(stone[0], stone[1], (3-color))
     if move:
-      urgency = 40
-      return [move, urgency, 'capture ladder']
+      if not is_suicide(move[0], move[1], color):
+        if not is_atari(move[0], move[1], color):
+          urgency = (width*2)
+          return [move, urgency, 'capture ladder']
   if len(group['liberties']) > 2: # surround group
     for move in group['liberties']:
       if not is_suicide(move[0], move[1], color):
-        urgency = (abs(int(width/2) - move[0]) + abs(int(width/2) - move[1]))*3
+        urgency = (abs(int(width/2) - move[0]) + abs(int(width/2) - move[1]))*5
         if (move[0] == 1 or move[1] == 1 or
             move[0] == (width-2) or move[1] == (width-2)):
             urgency = 3
@@ -261,22 +263,22 @@ def defend(group, color):
         group['liberties'][0][1] == 1 or
         group['liberties'][0][0] == (width-2) or
         group['liberties'][0][1] == (width-2)):
-        urgency = 1
+        urgency = 2
     if not is_suicide(group['liberties'][0][0], group['liberties'][0][1], color):
-      return [group['liberties'][0], urgency, 'save']
-  if len(group['liberties']) == 2: # defend ladder
-    print('should defend ladder...', file=sys.stderr)
-  if len(group['liberties']) > 2: # extend group
-    for move in group['liberties']: # TODO: find best save
+      stone = group['stones'][0]
+      ladder = check_ladder(stone[0], stone[1], color) # check if not trapped int a ladder
+      if not ladder: return [group['liberties'][0], urgency, 'save']
+  if len(group['liberties']) > 1: # extend group
+    for move in group['liberties']:
       if not is_suicide(move[0], move[1], color):
         if not is_clover(move[0], move[1]):
           urgency = (abs(int(width/2) - move[0]) + abs(int(width/2) - move[1]))
-          if (move[0] == 1 or move[1] == 1 or
-              move[0] == (width-2) or move[1] == (width-2)):
-              urgency = 2
+          if (move[0] < 3 or move[1] < 3 or
+              move[0] < (width-5) or move[1] < (width-5)):
+              urgency = 1 # crawling on 1st and 2nd lines is bad
           moves.append([move, urgency, 'extend'])
     if len(moves):
-      moves.sort(key=lambda x: x[1])
+      moves.sort(key=lambda x: x[1], reverse=True)
       return moves[0]
   return NONE
 
@@ -326,7 +328,7 @@ def genmove(color):
     moves.sort(key=lambda x: x[1], reverse=True)
     # debug print generated moves stats
     for move in moves: print(move_to_string(move[0]), move[1], move[2], file=sys.stderr)
-    return moves[0][0]
+    if moves[0][1] > 1: return moves[0][0]
   return NONE
 
 def move_to_string(move):
