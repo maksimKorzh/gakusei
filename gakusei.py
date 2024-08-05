@@ -182,19 +182,21 @@ def play(col, row, color):
         board[stone[1]][stone[0]] = EMPTY
   side = (3-color)
 
-def is_ladder(col, row, color):
+def is_ladder(col, row, color, first_run):
   '''
   Resursively simulates a ladder chasing and
   figures out whether it works or not
   '''
   group = make_group(col, row, color)
-  if len(group['liberties']) == 0:
-    return True    
+  if len(group['liberties']) == 0: return 1
   if len(group['liberties']) == 1:
+    if board[row][col] != EMPTY and first_run == False:
+      if len(group['liberties']) <= 1: return 1
+      else: return 0
     board[row][col] = color
     new_col = group['liberties'][0][0]
     new_row = group['liberties'][0][1]
-    if is_ladder(new_col, new_row, color): return 1
+    if is_ladder(new_col, new_row, color, False): return 1
     board[row][col] = EMPTY
   if len(group['liberties']) == 2:
     for move in group['liberties']:
@@ -202,7 +204,7 @@ def is_ladder(col, row, color):
       group = make_group(col, row, color)
       new_col = group['liberties'][0][0]
       new_row = group['liberties'][0][1]
-      if is_ladder(new_col, new_row, color): return move
+      if is_ladder(new_col, new_row, color, False): return move
       board[move[1]][move[0]] = EMPTY
   return 0
 
@@ -214,7 +216,7 @@ def check_ladder(col, row, color):
   '''
   global board
   current_board = copy.deepcopy(board)
-  ladder = is_ladder(col, row, color)
+  ladder = is_ladder(col, row, color, True)
   board = copy.deepcopy(current_board)
   return ladder
 
@@ -241,7 +243,6 @@ def attack(group, color):
       if not is_suicide(move[0], move[1], color):
         urgency = calculate_urgency('surround', group, move)
         if is_atari(move[0], move[1], color): continue
-        print('candidate surround:', move_to_string(move), urgency, file=sys.stderr)
         moves.append([move, urgency, 'surround'])
     if len(moves):
       moves.sort(key=lambda x: x[1])
@@ -399,23 +400,21 @@ def debug():
   board = [
     [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
     [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-    [3, 0, 0, 1, 1, 1, 0, 0, 0, 0, 3],
-    [3, 0, 1, 2, 2, 1, 0, 0, 0, 0, 3],
-    [3, 0, 0, 1, 2, 0, 0, 0, 0, 0, 3],
-    [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-    [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+    [3, 0, 0, 0, 0, 1, 0, 0, 0, 0, 3],
+    [3, 0, 0, 0, 1, 2, 0, 0, 0, 0, 3],
+    [3, 0, 0, 2, 1, 2, 1, 0, 0, 0, 3],
+    [3, 0, 0, 2, 2, 1, 0, 0, 0, 0, 3],
+    [3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 3],
     [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
     [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
     [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
     [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
   ]
 
-  print('ladder', check_ladder(4, 3, WHITE))
+  #print('ladder', check_ladder(4, 3, WHITE))
+  print('ladder for:', move_to_string((5,3)))
+  print(is_ladder(5,4, WHITE, True))
   print_board()
-  update_groups()
-  print_groups()
-
-  gtp()
 
 def main():
   global width
