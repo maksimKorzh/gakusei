@@ -27,15 +27,15 @@ groups = []                 # black and white groups database
 # PATTERN DATABASE
 patterns= [
   [
+    [FENCE, FENCE, FENCE],
+    [FENCE, EMPTY, EMPTY],
+    [FENCE, EMPTY, SOLVE]
+  ],
+  [
     [EMPTY, EMPTY, EMPTY],
     [BLACK, SOLVE, BLACK],
     [EMPTY, WHITE, EMPTY]
-  ],
-  #[
-  #  [EMPTY, EMPTY, EMPTY],
-  #  [EMPTY, EMPTY, EMPTY],
-  #  [EMPTY, EMPTY, EMPTY]
-  #]
+  ]
 ]
 
 def init_board():
@@ -255,8 +255,10 @@ def match_pattern():
       response = ()
       for row in range(3):
         for col in range(3):
-          if mpat[row][col] == SOLVE: response = (bpat[0][0] + col, bpat[0][1] + row)
-          if mpat[row][col] != SOLVE and mpat[row][col] != STONE:
+          if mpat[row][col] == SOLVE:
+            response = (bpat[0][0] + col, bpat[0][1] + row)
+            if board[response[1]][response[0]] != EMPTY: is_match = False
+          elif mpat[row][col] != SOLVE and mpat[row][col] != STONE:
             if mpat[row][col] != bpat[1][row][col]: is_match = False
       if is_match:
         urgency = calculate_urgency('pattern', [], response)
@@ -299,7 +301,6 @@ def check_ladder(col, row, color):
   ladder = is_ladder(col, row, color, True)
   board = copy.deepcopy(current_board)
   return ladder
-
 
 def attack(group, color):
   '''
@@ -387,7 +388,6 @@ def genmove(color):
   the more urgent a given move is. Eventually a move
   with the biggest urgency is considered to be the best.
   '''
-  
   # Generate attacking moves
   update_groups()
   moves = []
@@ -406,7 +406,7 @@ def genmove(color):
   for move in match_pattern():
     if move not in moves:
       moves.append(move)
-  
+
   # Sort moves in place by urgency in descending order
   if len(moves):
     moves.sort(key=lambda x: x[1], reverse=True)
