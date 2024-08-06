@@ -248,6 +248,7 @@ def match_pattern():
   '''
   Returns a list of pattern matching moves on board
   '''
+  pattern_moves = []
   for mpat in make_patterns():
     for bpat in board_to_3x3_patterns():
       is_match = True
@@ -258,12 +259,9 @@ def match_pattern():
           if mpat[row][col] != SOLVE and mpat[row][col] != STONE:
             if mpat[row][col] != bpat[1][row][col]: is_match = False
       if is_match:
-        print('match pattern:')
-        for i in mpat: print(i)
-        print()
-        for i in bpat[1]: print(i)
-        print()
-        print('response', move_to_string(response))
+        urgency = calculate_urgency('pattern', [], response)
+        pattern_moves.append([response, urgency, 'pattern'])
+  return pattern_moves
 
 def is_ladder(col, row, color, first_run):
   '''
@@ -290,7 +288,6 @@ def is_ladder(col, row, color, first_run):
       if is_ladder(new_col, new_row, color, False): return move
       board[move[1]][move[0]] = EMPTY
   return 0
-
 
 def check_ladder(col, row, color):
   '''
@@ -360,15 +357,17 @@ def calculate_urgency(move_type, group, move):
   Returns urgency value based on group size
   and amount of its liberties, move type and location
   '''
-  urgency = int(len(group['stones']) / len(group['liberties']))
-  center = (width // 2, width // 2)
-  distance = abs(move[0] - center[0]) + abs(move[1] - center[1])
-  if move_type == 'capture': urgency += (width*30)
-  elif move_type == 'surround': urgency += ((width*20)+distance)
-  elif move_type == 'ladder': urgency += (width*25)
-  elif move_type == 'save': urgency += ((width*30)-distance)
-  elif move_type == 'extend': urgency += ((width*20)-distance)
-  return urgency
+  if move_type == 'pattern': return (width*21)
+  else:
+    urgency = int(len(group['stones']) / len(group['liberties']))
+    center = (width // 2, width // 2)
+    distance = abs(move[0] - center[0]) + abs(move[1] - center[1])
+    if move_type == 'capture': urgency += (width*30)
+    elif move_type == 'surround': urgency += ((width*20)+distance)
+    elif move_type == 'ladder': urgency += (width*25)
+    elif move_type == 'save': urgency += ((width*30)-distance)
+    elif move_type == 'extend': urgency += ((width*20)-distance)
+    return urgency
 
 def genmove(color):
   '''
@@ -385,20 +384,11 @@ def genmove(color):
   For a contact play (attack/defense) "urgency" is
   calculated via dividing the number of stones by
   the amount of liberties, the higher value we have
-  the more urgent a given move is.
-
-  For pattern matching
-  "urgency" is assigned with...
-
-  Eventually
-  a move with the biggest urgency is considered to be
-  the best.
+  the more urgent a given move is. Eventually a move
+  with the biggest urgency is considered to be the best.
   '''
   
-  # First we need to get all attacking moves,
-  # so we loop over opponent's group and call
-  # attack(group) to return the best attacking
-  # move with associated urgency.
+  # Generate attacking moves
   update_groups()
   moves = []
   for group in groups[(3-color-1)]: # attack opponent's weakest group
@@ -406,9 +396,15 @@ def genmove(color):
     if move != NONE and move not in moves:
       moves.append(move)
   
+  # Generate defensive moves
   for group in groups[(color-1)]: # defend own weakest group
     move = defend(group, color)
     if move != NONE and move not in moves:
+      moves.append(move)
+  
+  # Generate pattern matches
+  for move in match_pattern():
+    if move not in moves:
       moves.append(move)
   
   # Sort moves in place by urgency in descending order
@@ -506,5 +502,5 @@ def main():
   init_board(); # set up board
   gtp()         # start GTP IO communication
 
-debug()
-#main()
+#debug()
+main()
