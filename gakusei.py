@@ -13,7 +13,8 @@ EMPTY = 0                   # blanc board square value
 BLACK = 1                   # value of board square occupied by black stone
 WHITE = 2                   # value of board square occupied by white stone
 FENCE = 3                   # offboard value
-ESCAPE = 4                  # liberty mask value
+STONE = 4                   # any stone value
+ESCAPE = 5                  # liberty mask value
 
 # GLOBAL VARIABLES
 width = NONE                # board width (9, 13, 19 or other)
@@ -21,6 +22,20 @@ board = [[]]                # board position, two dimensional array
 side = NONE                 # side to move, either BLACK or WHITE
 ko = [NONE, NONE]           # [col, row] Ko square, cannot set a stone on it
 groups = []                 # black and white groups database
+
+# PATTERN DATABASE
+patterns= [
+  [
+    [WHITE, EMPTY, EMPTY],
+    [EMPTY, BLACK, EMPTY],
+    [EMPTY, EMPTY, STONE]
+  ],
+  [
+    [WHITE, EMPTY, EMPTY],
+    [EMPTY, BLACK, STONE],
+    [EMPTY, EMPTY, EMPTY]
+  ]
+]
 
 def init_board():
   global board, side, ko, groups
@@ -181,6 +196,40 @@ def play(col, row, color):
       for stone in group['stones']:
         board[stone[1]][stone[0]] = EMPTY
   side = (3-color)
+
+def rotate_pattern(pattern):
+  '''
+  Returns a copy of a 90 degrees rotated pattern
+  '''
+  rotate = copy.deepcopy(pattern)
+  return [[rotate[2 - j][i] for j in range(3)] for i in range(3)]
+
+def swap_colors(pattern):
+  '''
+  Returns a copy of a pattern with black and white stones swapped
+  '''
+  swapped = copy.deepcopy(pattern)
+  for row in range(3):
+    for col in range(3):
+      if swapped[row][col] == BLACK: swapped[row][col] = WHITE
+      elif swapped[row][col] == WHITE: swapped[row][col] = BLACK
+  return swapped
+
+def make_patterns():
+  '''
+  Extends existing pattern database with patterns
+  rotated into 4 directions with normal and swapped
+  colors, returns the eventual pattern database to
+  match board with
+  '''
+  all_patterns = []
+  for pattern in patterns:
+    for _ in range(4):
+      pattern = rotate_pattern(pattern)
+      swapped = swap_colors(pattern)
+      for pat in [pattern, swapped]:
+        all_patterns.append(pat)
+  return all_patterns
 
 def is_ladder(col, row, color, first_run):
   '''
@@ -412,9 +461,13 @@ def debug():
   ]
 
   #print('ladder', check_ladder(4, 3, WHITE))
-  print('ladder for:', move_to_string((5,3)))
-  print(is_ladder(5,4, WHITE, True))
+  #print('ladder for:', move_to_string((5,3)))
+  #print(is_ladder(5,4, WHITE, True))
   print_board()
+
+  for pat in make_patterns():
+    for i in pat: print(i)
+    print()
 
 def main():
   global width
@@ -422,5 +475,5 @@ def main():
   init_board(); # set up board
   gtp()         # start GTP IO communication
 
-#debug()
-main()
+debug()
+#main()
