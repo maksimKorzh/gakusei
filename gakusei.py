@@ -13,8 +13,9 @@ EMPTY = 0                   # blanc board square value
 BLACK = 1                   # value of board square occupied by black stone
 WHITE = 2                   # value of board square occupied by white stone
 FENCE = 3                   # offboard value
-STONE = 4                   # any stone value
-ESCAPE = 5                  # liberty mask value
+STONE = 4                   # any stone value, including EMPTY
+SOLVE = 5                   # pattern response value
+ESCAPE = 6                  # liberty mask value
 
 # GLOBAL VARIABLES
 width = NONE                # board width (9, 13, 19 or other)
@@ -26,15 +27,15 @@ groups = []                 # black and white groups database
 # PATTERN DATABASE
 patterns= [
   [
-    [WHITE, EMPTY, EMPTY],
-    [EMPTY, BLACK, EMPTY],
-    [EMPTY, EMPTY, STONE]
+    [EMPTY, EMPTY, EMPTY],
+    [BLACK, SOLVE, BLACK],
+    [EMPTY, WHITE, EMPTY]
   ],
-  [
-    [WHITE, EMPTY, EMPTY],
-    [EMPTY, BLACK, STONE],
-    [EMPTY, EMPTY, EMPTY]
-  ]
+  #[
+  #  [EMPTY, EMPTY, EMPTY],
+  #  [EMPTY, EMPTY, EMPTY],
+  #  [EMPTY, EMPTY, EMPTY]
+  #]
 ]
 
 def init_board():
@@ -230,6 +231,39 @@ def make_patterns():
       for pat in [pattern, swapped]:
         all_patterns.append(pat)
   return all_patterns
+
+def board_to_3x3_patterns():
+  '''
+  Returns board as a list of 3x3 patterns for matching purposes
+  '''
+  board_patterns = []
+  blen = len(board)
+  if blen < 3: raise ValueError("The array must be at least 3x3 in size.")
+  for row in range(blen - 2):
+    for col in range(blen - 2):
+      board_patterns.append([(col, row), [prow[col:col+3] for prow in board[row:row+3]]])
+  return board_patterns
+
+def match_pattern():
+  '''
+  Returns a list of pattern matching moves on board
+  '''
+  for mpat in make_patterns():
+    for bpat in board_to_3x3_patterns():
+      is_match = True
+      response = ()
+      for row in range(3):
+        for col in range(3):
+          if mpat[row][col] == SOLVE: response = (bpat[0][0] + col, bpat[0][1] + row)
+          if mpat[row][col] != SOLVE and mpat[row][col] != STONE:
+            if mpat[row][col] != bpat[1][row][col]: is_match = False
+      if is_match:
+        print('match pattern:')
+        for i in mpat: print(i)
+        print()
+        for i in bpat[1]: print(i)
+        print()
+        print('response', move_to_string(response))
 
 def is_ladder(col, row, color, first_run):
   '''
@@ -449,12 +483,12 @@ def debug():
   board = [
     [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
     [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-    [3, 0, 0, 0, 0, 1, 0, 0, 0, 0, 3],
-    [3, 0, 0, 0, 1, 2, 0, 0, 0, 0, 3],
-    [3, 0, 0, 2, 1, 2, 1, 0, 0, 0, 3],
-    [3, 0, 0, 2, 2, 1, 0, 0, 0, 0, 3],
-    [3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 3],
+    [3, 0, 1, 0, 1, 0, 0, 0, 0, 0, 3],
+    [3, 0, 0, 2, 0, 0, 0, 0, 0, 0, 3],
     [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+    [3, 0, 0, 0, 0, 0, 2, 0, 0, 0, 3],
+    [3, 0, 0, 0, 0, 0, 0, 1, 0, 0, 3],
+    [3, 0, 0, 0, 0, 0, 2, 0, 0, 0, 3],
     [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
     [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
     [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
@@ -464,10 +498,7 @@ def debug():
   #print('ladder for:', move_to_string((5,3)))
   #print(is_ladder(5,4, WHITE, True))
   print_board()
-
-  for pat in make_patterns():
-    for i in pat: print(i)
-    print()
+  match_pattern()
 
 def main():
   global width
