@@ -6,6 +6,7 @@
 
 import sys
 import copy
+import random
 
 # GLOBAL CONSTANTS
 NONE = -1                   # value of not initialized variable
@@ -40,6 +41,11 @@ patterns= [
     [EMPTY, EMPTY, EMPTY],  # . . .
     [STONE, WHITE, SOLVE],  # ? O $  Shoulder hit
     [EMPTY, STONE, BLACK],  # . ? X
+  ],
+  [
+    [EMPTY, STONE, EMPTY],  # . ? .
+    [STONE, BLACK, EMPTY],  # ? X .  Cosumi
+    [EMPTY, EMPTY, SOLVE],  # . . $
   ],
   [
     [EMPTY, EMPTY, EMPTY],  # . . .
@@ -271,6 +277,41 @@ def is_atari(col, row, color):
   board[row][col] = EMPTY
   return atari
 
+def get_influence(col, row):
+  influence = 0
+  try:
+    if board[row][col]     == EMPTY: influence += 60
+    if board[row][col+1]   == EMPTY: influence += 13
+    if board[row][col-1]   == EMPTY: influence += 13
+    if board[row][col+2]   == EMPTY: influence += 5
+    if board[row][col-2]   == EMPTY: influence += 5
+    if board[row][col+3]   == EMPTY: influence += 1
+    if board[row][col-3]   == EMPTY: influence += 1
+    if board[row+1][col]   == EMPTY: influence += 13
+    if board[row+1][col+1] == EMPTY: influence += 6
+    if board[row+1][col-1] == EMPTY: influence += 6
+    if board[row+1][col+2] == EMPTY: influence += 2
+    if board[row+1][col-2] == EMPTY: influence += 2
+    if board[row-1][col]   == EMPTY: influence += 13
+    if board[row-1][col+1] == EMPTY: influence += 6
+    if board[row-1][col-1] == EMPTY: influence += 6
+    if board[row-1][col+2] == EMPTY: influence += 2
+    if board[row-1][col-2] == EMPTY: influence += 2
+    if board[row+2][col]   == EMPTY: influence += 5
+    if board[row+2][col+1] == EMPTY: influence += 1
+    if board[row+2][col-1] == EMPTY: influence += 1
+    if board[row+2][col+2] == EMPTY: influence += 1
+    if board[row+2][col-2] == EMPTY: influence += 1
+    if board[row-2][col]   == EMPTY: influence += 5
+    if board[row-2][col+1] == EMPTY: influence += 1
+    if board[row-2][col-1] == EMPTY: influence += 1
+    if board[row-2][col+2] == EMPTY: influence += 1
+    if board[row-2][col-2] == EMPTY: influence += 1
+    if board[row+3][col]   == EMPTY: influence += 1
+    if board[row-3][col]   == EMPTY: influence += 1
+  except: pass
+  return influence
+
 def play(col, row, color):
   '''
   Sets stone of a given color at col, row,
@@ -288,20 +329,23 @@ def play(col, row, color):
         board[stone[1]][stone[0]] = EMPTY
   side = (3-color)
 
-def fuseki(color):
+def big_moves(color):
   '''
-  Attempts to make big moves in fuseki, particularly
-  taking all the star points on board
+  Attempts to make a big move based on influence
   '''
   moves = []
-  for move in [
-    (4,4), (4,width-5), (width-5,4), (width-5,width-5), (width//2,width//2),
-    (4,width//2), (width//2,4), (width-5,width//2), (width//2,width-5)
-  ]:
-    if board[move[1]][move[0]] == EMPTY and move != ko and not is_suicide(move[0], move[1], color):
-      urgency = calculate_urgency('fuseki', [], move)
-      if is_atari(move[0], move[1], color): continue
-      moves.append([move, urgency, 'fuseki'])
+  rows = list(range(width))
+  cols = list(range(width))
+  for row in range(width):
+    for col in range(width):
+      if board[row][col] == FENCE: continue
+      if board[row][col] == EMPTY and (col, row) != ko and not is_suicide(col, row, color):
+        urgency = calculate_urgency('big_move', get_influence(col, row), (col, row)) + random.randint(0,5)
+        if (col, row) in [(4,4), (4,width-5), (width-5,4), (width-5,width-5)]: urgency += random.randint(11, 20)
+        if (col, row) in [(4,width//2), (width//2,4), (width-5,width//2), (width//2,width-5)]: urgency += random.randint(1, 10)
+        if row == 3 or row == (width-4) or col == 3 or col == (width-4): urgency += random.randint(5,15)
+        if is_atari(col, row, color): continue
+        moves.append([(col, row), urgency, 'big_move'])
   return moves
 
 def rotate_pattern(pattern):
@@ -467,7 +511,7 @@ def calculate_urgency(move_type, group, move):
   Returns urgency value based on group size
   and amount of its liberties, move type and location
   '''
-  if move_type == 'fuseki': return (width*30)
+  if move_type == 'big_move': return (width*20)+group
   elif move_type == 'pattern':
     center = (width // 4, width // 4)
     distance = abs(move[0] - center[0]) + abs(move[1] - center[1])
@@ -508,8 +552,8 @@ def genmove(color):
   update_groups()
   moves = []
 
-  # Generate fuseki moves
-  for move in fuseki(color):
+  # Generate big move
+  for move in big_moves(color):
     if move not in moves:
       moves.append(move)
 
@@ -617,7 +661,7 @@ def debug():
   #print('ladder for:', move_to_string((5,3)))
   #print(is_ladder(5,4, WHITE, True))
   print_board()
-  fuseki()
+  big_move(BLACK)
 
 def main():
   global width
