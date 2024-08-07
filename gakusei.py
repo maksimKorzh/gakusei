@@ -24,17 +24,107 @@ side = NONE                 # side to move, either BLACK or WHITE
 ko = [NONE, NONE]           # [col, row] Ko square, cannot set a stone on it
 groups = []                 # black and white groups database
 
-# PATTERN DATABASE
+# PATTERN DATABASE          # "$" is SOLVE, "." is EMPTY, "X" = BLACK, "O" is WHITE, "?" is STONE, ~ is FENCE
 patterns= [
   [
-    [FENCE, FENCE, FENCE],
-    [FENCE, EMPTY, EMPTY],
-    [FENCE, EMPTY, SOLVE]
+    [STONE, EMPTY, STONE],  # ? . ?
+    [BLACK, EMPTY, SOLVE],  # X . $  One space jump
+    [EMPTY, EMPTY, EMPTY]   # . . .
   ],
   [
-    [EMPTY, EMPTY, EMPTY],
-    [BLACK, SOLVE, BLACK],
-    [EMPTY, WHITE, EMPTY]
+    [EMPTY, EMPTY, EMPTY],  # . ? .
+    [BLACK, EMPTY, STONE],  # X . ?  Knight's move
+    [EMPTY, EMPTY, SOLVE]   # . . $
+  ],
+  [
+    [EMPTY, EMPTY, EMPTY],  # . . .
+    [STONE, WHITE, SOLVE],  # ? O $  Shoulder hit
+    [EMPTY, STONE, BLACK],  # . ? X
+  ],
+  [
+    [EMPTY, EMPTY, EMPTY],  # . . .
+    [EMPTY, WHITE, STONE],  # . O ?  Hane
+    [SOLVE, BLACK, STONE],  # $ X ?
+  ],
+  [
+    [WHITE, SOLVE, EMPTY],  # O $ .
+    [WHITE, BLACK, EMPTY],  # O X .  Bend
+    [STONE, STONE, EMPTY]   # ? ? .
+  ],
+  [
+    [STONE, WHITE, STONE],  # ? O ?
+    [WHITE, BLACK, SOLVE],  # O X $  Extend
+    [BLACK, EMPTY, EMPTY]   # X . .
+  ],
+  [
+    [BLACK, WHITE, STONE],  # X O ?
+    [WHITE, EMPTY, WHITE],  # O . O  Eye
+    [SOLVE, WHITE, STONE]   # $ O ?
+  ],
+  [
+    [STONE, EMPTY, STONE],  # ? . ?
+    [BLACK, EMPTY, BLACK],  # X . X  Peep 1
+    [EMPTY, SOLVE, EMPTY],  # . $ .
+  ],
+  [
+    [BLACK, BLACK, WHITE],  # X X O
+    [STONE, SOLVE, BLACK],  # ? $ X  Peep 2
+    [STONE, STONE, STONE]   # ? ? ?
+  ],
+  [
+    [EMPTY, WHITE, BLACK],  # . O X
+    [EMPTY, EMPTY, WHITE],  # . . O  Peep 3
+    [STONE, SOLVE, STONE]   # ? $ ?
+  ],
+  [
+    [STONE, STONE, STONE],  # ? ? ?
+    [BLACK, SOLVE, BLACK],  # X $ X  Wedge 1
+    [STONE, WHITE, STONE]   # ? O ?
+  ],
+  [
+    [STONE, STONE, STONE],  # ? ? ?
+    [BLACK, WHITE, WHITE],  # X O O  Wedge 2
+    [STONE, SOLVE, BLACK],  # ? $ X
+  ],
+  [
+    [EMPTY, SOLVE, EMPTY],  # . $ .
+    [BLACK, WHITE, BLACK],  # X O X  Split 1
+    [EMPTY, WHITE, EMPTY]   # . O .
+  ],
+  [
+    [BLACK, EMPTY, STONE],  # X . ?
+    [EMPTY, SOLVE, EMPTY],  # . $ .  Split 2
+    [STONE, EMPTY, BLACK]   # ? . X
+  ],
+  [
+    [STONE, STONE, STONE],  # ? ? ?
+    [WHITE, BLACK, EMPTY],  # O X .  Block
+    [SOLVE, EMPTY, BLACK],  # $ . X
+  ],
+  [
+    [STONE, STONE, STONE],  # ? ? ?
+    [WHITE, SOLVE, STONE],  # O $ ?
+    [BLACK, WHITE, STONE]   # X O ?  Cut 1
+  ],
+  [
+    [BLACK, BLACK, BLACK],  # X X X
+    [WHITE, BLACK, WHITE],  # O X O  Cut 2
+    [STONE, WHITE, SOLVE]   # ? O $
+  ],
+  [
+    [WHITE, BLACK, STONE],  # O X ?
+    [BLACK, WHITE, STONE],  # X O ?  Cut 3
+    [WHITE, SOLVE, STONE]   # O $ ?
+  ],
+  [
+    [EMPTY, BLACK, WHITE],  # . X O
+    [SOLVE, EMPTY, BLACK],  # $ . X  Defend cut
+    [EMPTY, EMPTY, BLACK]   # . . X
+  ],
+  [
+    [FENCE, FENCE, FENCE],  # ~ ~ ~
+    [EMPTY, SOLVE, BLACK],  # . $ X  Yose
+    [EMPTY, WHITE, BLACK]   # . O X
   ]
 ]
 
@@ -198,6 +288,22 @@ def play(col, row, color):
         board[stone[1]][stone[0]] = EMPTY
   side = (3-color)
 
+def fuseki(color):
+  '''
+  Attempts to make big moves in fuseki, particularly
+  taking all the star points on board
+  '''
+  moves = []
+  for move in [
+    (4,4), (4,width-5), (width-5,4), (width-5,width-5), (width//2,width//2),
+    (4,width//2), (width//2,4), (width-5,width//2), (width//2,width-5)
+  ]:
+    if board[move[1]][move[0]] == EMPTY and move != ko and not is_suicide(move[0], move[1], color):
+      urgency = calculate_urgency('fuseki', [], move)
+      if is_atari(move[0], move[1], color): continue
+      moves.append([move, urgency, 'fuseki'])
+  return moves
+
 def rotate_pattern(pattern):
   '''
   Returns a copy of a 90 degrees rotated pattern
@@ -244,7 +350,7 @@ def board_to_3x3_patterns():
       board_patterns.append([(col, row), [prow[col:col+3] for prow in board[row:row+3]]])
   return board_patterns
 
-def match_pattern():
+def match_pattern(color):
   '''
   Returns a list of pattern matching moves on board
   '''
@@ -261,8 +367,11 @@ def match_pattern():
           elif mpat[row][col] != SOLVE and mpat[row][col] != STONE:
             if mpat[row][col] != bpat[1][row][col]: is_match = False
       if is_match:
-        urgency = calculate_urgency('pattern', [], response)
-        pattern_moves.append([response, urgency, 'pattern'])
+        urgency = calculate_urgency('pattern', mpat, response)
+        if not is_suicide(response[0], response[1], color):
+          if not is_atari(response[0], response[1], color):
+            if not is_clover(response[0], response[1]):
+              pattern_moves.append([response, urgency, 'pattern'])
   return pattern_moves
 
 def is_ladder(col, row, color, first_run):
@@ -358,15 +467,22 @@ def calculate_urgency(move_type, group, move):
   Returns urgency value based on group size
   and amount of its liberties, move type and location
   '''
-  if move_type == 'pattern': return (width*21)
+  if move_type == 'fuseki': return (width*30)
+  elif move_type == 'pattern':
+    center = (width // 4, width // 4)
+    distance = abs(move[0] - center[0]) + abs(move[1] - center[1])
+    weight = 0
+    for row in group:
+      for col in row: weight += col
+    return (width*21)-distance+5+weight*10
   else:
-    urgency = int(len(group['stones']) / len(group['liberties']))
     center = (width // 2, width // 2)
     distance = abs(move[0] - center[0]) + abs(move[1] - center[1])
-    if move_type == 'capture': urgency += (width*30)
+    urgency = int(len(group['stones']) / len(group['liberties']))
+    if move_type == 'capture': urgency += (width*37)
     elif move_type == 'surround': urgency += ((width*20)+distance)
     elif move_type == 'ladder': urgency += (width*25)
-    elif move_type == 'save': urgency += ((width*30)-distance)
+    elif move_type == 'save': urgency += ((width*37)-distance)
     elif move_type == 'extend': urgency += ((width*20)-distance)
     return urgency
 
@@ -375,22 +491,34 @@ def genmove(color):
   Returns the best move to be played by the given
   color, considering the following heuristics:
 
-  1. ATTACK OPPONENT'S GROUP
-  2. DEFEND OWN GROUP
-  3. MATCH PATTERNS
+  1. TAKE BIG POINT IN FUSEKI
+  2. MATCH PATTERNS
+  3. ATTACK OPPONENT'S GROUP
+  4. DEFEND OWN GROUP
 
-  There might be several attacking moves, several
-  defensive ones and a few pattern matches. Each
-  move gets assigned the value of its "urgency".
-  For a contact play (attack/defense) "urgency" is
-  calculated via dividing the number of stones by
-  the amount of liberties, the higher value we have
+  Each move gets assigned the value of its "urgency".
+  Fuseki moves has the biggest urgency, pattern matches
+  are balanced with attack/defense actions. For a contact
+  play "urgency" is calculated via dividing the number of
+  stones by the amount of liberties, the higher value we have
   the more urgent a given move is. Eventually a move
   with the biggest urgency is considered to be the best.
   '''
-  # Generate attacking moves
+  
   update_groups()
   moves = []
+
+  # Generate fuseki moves
+  for move in fuseki(color):
+    if move not in moves:
+      moves.append(move)
+
+  # Generate pattern matches
+  for move in match_pattern(color):
+    if move not in moves:
+      moves.append(move)
+
+  # Generate attacking moves
   for group in groups[(3-color-1)]: # attack opponent's weakest group
     move = attack(group, color)
     if move != NONE and move not in moves:
@@ -402,16 +530,11 @@ def genmove(color):
     if move != NONE and move not in moves:
       moves.append(move)
   
-  # Generate pattern matches
-  for move in match_pattern():
-    if move not in moves:
-      moves.append(move)
-
   # Sort moves in place by urgency in descending order
   if len(moves):
     moves.sort(key=lambda x: x[1], reverse=True)
     # debug print generated moves stats
-    for move in moves: print(move_to_string(move[0]), move[1], move[2], file=sys.stderr)
+    #for move in moves: print(move_to_string(move[0]), move[1], move[2], file=sys.stderr)
     if moves[0][1] > 1: return moves[0][0]
   return NONE
 
@@ -461,14 +584,14 @@ def gtp():
 
 def debug():
   global width, board
-  width=9+2
+  width=19+2
   init_board()
   #board = [
   #  [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
   #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-  #  [3, 0, 0, 1, 1, 1, 0, 0, 0, 0, 3],
-  #  [3, 0, 1, 2, 2, 0, 0, 0, 0, 0, 3],
-  #  [3, 0, 0, 1, 0, 1, 0, 0, 0, 0, 3],
+  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
   #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
   #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
   #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
@@ -476,25 +599,25 @@ def debug():
   #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
   #  [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
   #]
-  board = [
-    [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
-    [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-    [3, 0, 1, 0, 1, 0, 0, 0, 0, 0, 3],
-    [3, 0, 0, 2, 0, 0, 0, 0, 0, 0, 3],
-    [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-    [3, 0, 0, 0, 0, 0, 2, 0, 0, 0, 3],
-    [3, 0, 0, 0, 0, 0, 0, 1, 0, 0, 3],
-    [3, 0, 0, 0, 0, 0, 2, 0, 0, 0, 3],
-    [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-    [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-    [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
-  ]
+  #board = [
+  #  [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
+  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+  #  [3, 0, 1, 0, 1, 0, 0, 0, 0, 0, 3],
+  #  [3, 0, 0, 2, 0, 0, 0, 0, 0, 0, 3],
+  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+  #  [3, 0, 0, 0, 0, 0, 2, 0, 0, 0, 3],
+  #  [3, 0, 0, 0, 0, 0, 0, 1, 0, 0, 3],
+  #  [3, 0, 0, 0, 0, 0, 2, 0, 0, 0, 3],
+  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+  #  [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
+  #]
 
   #print('ladder', check_ladder(4, 3, WHITE))
   #print('ladder for:', move_to_string((5,3)))
   #print(is_ladder(5,4, WHITE, True))
   print_board()
-  match_pattern()
+  fuseki()
 
 def main():
   global width
