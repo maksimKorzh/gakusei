@@ -39,12 +39,12 @@ patterns= [
   ],
   [
     [EMPTY, EMPTY, EMPTY],  # . . .
-    [STONE, WHITE, SOLVE],  # ? O $  Shoulder hit
+    [STONE, WHITE, SOLVE],  # ? O $  Block
     [EMPTY, STONE, BLACK],  # . ? X
   ],
   [
     [EMPTY, STONE, EMPTY],  # . ? .
-    [STONE, BLACK, EMPTY],  # ? X .  Cosumi
+    [STONE, BLACK, EMPTY],  # ? X .  Shoulder hit
     [EMPTY, EMPTY, SOLVE],  # . . $
   ],
   [
@@ -58,74 +58,29 @@ patterns= [
     [STONE, STONE, EMPTY]   # ? ? .
   ],
   [
-    [STONE, WHITE, STONE],  # ? O ?
-    [WHITE, BLACK, SOLVE],  # O X $  Extend
-    [BLACK, EMPTY, EMPTY]   # X . .
-  ],
-  [
-    [BLACK, WHITE, STONE],  # X O ?
-    [WHITE, EMPTY, WHITE],  # O . O  Eye
-    [SOLVE, WHITE, STONE]   # $ O ?
-  ],
-  [
     [STONE, EMPTY, STONE],  # ? . ?
-    [BLACK, EMPTY, BLACK],  # X . X  Peep 1
+    [BLACK, EMPTY, BLACK],  # X . X  Peep
     [EMPTY, SOLVE, EMPTY],  # . $ .
   ],
   [
-    [BLACK, BLACK, WHITE],  # X X O
-    [STONE, SOLVE, BLACK],  # ? $ X  Peep 2
-    [STONE, STONE, STONE]   # ? ? ?
-  ],
-  [
-    [EMPTY, WHITE, BLACK],  # . O X
-    [EMPTY, EMPTY, WHITE],  # . . O  Peep 3
-    [STONE, SOLVE, STONE]   # ? $ ?
-  ],
-  [
     [STONE, STONE, STONE],  # ? ? ?
-    [BLACK, SOLVE, BLACK],  # X $ X  Wedge 1
+    [BLACK, SOLVE, BLACK],  # X $ X  Wedge
     [STONE, WHITE, STONE]   # ? O ?
   ],
   [
-    [STONE, STONE, STONE],  # ? ? ?
-    [BLACK, WHITE, WHITE],  # X O O  Wedge 2
-    [STONE, SOLVE, BLACK],  # ? $ X
-  ],
-  [
     [EMPTY, SOLVE, EMPTY],  # . $ .
-    [BLACK, WHITE, BLACK],  # X O X  Split 1
+    [BLACK, WHITE, BLACK],  # X O X  Split
     [EMPTY, WHITE, EMPTY]   # . O .
   ],
   [
-    [BLACK, EMPTY, STONE],  # X . ?
-    [EMPTY, SOLVE, EMPTY],  # . $ .  Split 2
-    [STONE, EMPTY, BLACK]   # ? . X
+    [STONE, EMPTY, EMPTY],  # ? . .
+    [WHITE, SOLVE, EMPTY],  # O $ .
+    [BLACK, WHITE, STONE]   # X O ?  Cut
   ],
   [
-    [STONE, STONE, STONE],  # ? ? ?
-    [WHITE, BLACK, EMPTY],  # O X .  Block
-    [SOLVE, EMPTY, BLACK],  # $ . X
-  ],
-  [
-    [STONE, STONE, STONE],  # ? ? ?
-    [WHITE, SOLVE, STONE],  # O $ ?
-    [BLACK, WHITE, STONE]   # X O ?  Cut 1
-  ],
-  [
-    [BLACK, BLACK, BLACK],  # X X X
-    [WHITE, BLACK, WHITE],  # O X O  Cut 2
-    [STONE, WHITE, SOLVE]   # ? O $
-  ],
-  [
-    [WHITE, BLACK, STONE],  # O X ?
-    [BLACK, WHITE, STONE],  # X O ?  Cut 3
-    [WHITE, SOLVE, STONE]   # O $ ?
-  ],
-  [
-    [EMPTY, BLACK, WHITE],  # . X O
-    [SOLVE, EMPTY, BLACK],  # $ . X  Defend cut
-    [EMPTY, EMPTY, BLACK]   # . . X
+    [EMPTY, WHITE, BLACK],  # . O X
+    [EMPTY, EMPTY, WHITE],  # . . O  Defend cut
+    [STONE, SOLVE, STONE]   # ? $ ?
   ],
   [
     [FENCE, FENCE, FENCE],  # ~ ~ ~
@@ -135,12 +90,12 @@ patterns= [
 ]
 
 def init_board():
-  global board, side, ko, groups
   '''
   Initializes board array of a given size with zeros,
   sets the side to move, resets a Ko square,
   clears groups database
   '''
+  global board, side, ko, groups
   board = [[0 for _ in range(width)] for _ in range(width)]
   for row in range(width):
     for col in range(width):
@@ -169,6 +124,9 @@ def print_board():
   print()
 
 def print_groups():
+  '''
+  Prints board group data structures
+  '''
   print('    Black groups:')
   for group in groups[BLACK-1]: print('      ', group)
   print('\n    White groups:')
@@ -214,11 +172,11 @@ def make_group(col, row, color):
   return add_stones(marks, color)
 
 def update_groups():
-  global groups
   '''
   Keeps track of BLACK and WHITE groups on board by
   maintaining coordinates of stones and their liberties
   '''
+  global groups
   groups = [[], []]
   for row in range(width):
     for col in range(width):
@@ -278,6 +236,11 @@ def is_atari(col, row, color):
   return atari
 
 def get_influence(col, row):
+  '''
+  Calculates influence at col, row -
+  the less uncrowded part of the board is
+  the bigger influence value is returned
+  '''
   influence = 0
   try:
     if board[row][col]     == EMPTY: influence += 60
@@ -344,8 +307,9 @@ def big_moves(color):
         if (col, row) in [(4,4), (4,width-5), (width-5,4), (width-5,width-5)]: urgency += random.randint(11, 20)
         if (col, row) in [(4,width//2), (width//2,4), (width-5,width//2), (width//2,width-5)]: urgency += random.randint(1, 10)
         if row == 3 or row == (width-4) or col == 3 or col == (width-4): urgency += random.randint(5,15)
-        if is_atari(col, row, color): continue
-        moves.append([(col, row), urgency, 'big_move'])
+        if not is_atari(col, row, color):
+          if not is_clover(col, row) != EMPTY:
+            moves.append([(col, row), urgency, 'big_move'])
   return moves
 
 def rotate_pattern(pattern):
@@ -535,18 +499,18 @@ def genmove(color):
   Returns the best move to be played by the given
   color, considering the following heuristics:
 
-  1. TAKE BIG POINT IN FUSEKI
+  1. TAKE BIG POINT
   2. MATCH PATTERNS
-  3. ATTACK OPPONENT'S GROUP
-  4. DEFEND OWN GROUP
+  3. ATTACK OPPONENT'S WEAKEST GROUP
+  4. DEFEND OWN WEAKEST GROUP
 
   Each move gets assigned the value of its "urgency".
-  Fuseki moves has the biggest urgency, pattern matches
-  are balanced with attack/defense actions. For a contact
-  play "urgency" is calculated via dividing the number of
-  stones by the amount of liberties, the higher value we have
-  the more urgent a given move is. Eventually a move
-  with the biggest urgency is considered to be the best.
+  Big moves and pattern matches are balanced with
+  attack/defense actions. For a contact play "urgency"
+  is calculated via dividing the number of stones by the
+  amount of liberties, the higher value we have the more
+  urgent a given move is. Eventually a move with the biggest
+  urgency is considered to be the best.
   '''
   
   update_groups()
@@ -577,9 +541,9 @@ def genmove(color):
   # Sort moves in place by urgency in descending order
   if len(moves):
     moves.sort(key=lambda x: x[1], reverse=True)
-    # debug print generated moves stats
+    # debug: print generated moves
     #for move in moves: print(move_to_string(move[0]), move[1], move[2], file=sys.stderr)
-    if moves[0][1] > 1: return moves[0][0]
+    return moves[0][0]
   return NONE
 
 def move_to_string(move):
@@ -626,48 +590,7 @@ def gtp():
     elif 'quit' in command: sys.exit()
     else: print('=\n') # skip currently unsupported commands
 
-def debug():
-  global width, board
-  width=19+2
-  init_board()
-  #board = [
-  #  [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
-  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-  #  [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
-  #]
-  #board = [
-  #  [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
-  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-  #  [3, 0, 1, 0, 1, 0, 0, 0, 0, 0, 3],
-  #  [3, 0, 0, 2, 0, 0, 0, 0, 0, 0, 3],
-  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-  #  [3, 0, 0, 0, 0, 0, 2, 0, 0, 0, 3],
-  #  [3, 0, 0, 0, 0, 0, 0, 1, 0, 0, 3],
-  #  [3, 0, 0, 0, 0, 0, 2, 0, 0, 0, 3],
-  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-  #  [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-  #  [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
-  #]
-
-  #print('ladder', check_ladder(4, 3, WHITE))
-  #print('ladder for:', move_to_string((5,3)))
-  #print(is_ladder(5,4, WHITE, True))
-  print_board()
-  big_move(BLACK)
-
-def main():
-  global width
-  width=19+2;   # set board width + offboard squares
-  init_board(); # set up board
-  gtp()         # start GTP IO communication
-
-#debug()
-main()
+# MAIN
+width=19+2;   # set board width + offboard squares
+init_board(); # set up board
+gtp()         # start GTP IO communication
