@@ -32,3 +32,6 @@ the same amount of knowledge.
 # How to play?
 Gakusei is a GTP engine, so you'll need <a href="https://github.com/SabakiHQ/Sabaki">Sabaki GUI</a>
 to play with it, however running GTP commands just right in terminal is also possible.
+
+# YouTube presentation
+https://youtu.be/vDT6DPYe0tA
