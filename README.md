@@ -19,7 +19,10 @@ was <a href="https://archive.org/details/byte-magazine-1981-04/page/n101/mode/2u
 by Jonathan K. Millen which has served as an inspiration for many developers,
 for instance GnuGo's original implementation is based on ideas introduced in Wally.
 Another notable attempt to implement somewhat an extended version of Wally was
-a C implementation by Bill Newman.
+a C implementation by Bill Newman. Gakusei is inspired by the latter - I took
+Bill's enhancements and tried to generalize them to some extent. With significantly
+less amount patterns to match "gakusei.py" is about as strong as "wallyplus", which is
+a C++ port of Bill's "wally.c" with influence estimation and GTP protocol being added.
 
 # Playing strength
 It's miserable, should be around 30kyu, however gakusei beats
