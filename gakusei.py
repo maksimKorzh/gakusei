@@ -286,7 +286,7 @@ def play(col, row, color):
   update_groups()
   for group in groups[(3-color-1)]:
     if len(group['liberties']) == 0:
-      if len(group['stones']) == 1 and is_clover(col, row) == (3-side):
+      if len(group['stones']) == 1 and is_clover(col, row) == (3-color):
         ko = group['stones'][0]
       for stone in group['stones']:
         board[stone[1]][stone[0]] = EMPTY
@@ -542,7 +542,7 @@ def genmove(color):
   if len(moves):
     moves.sort(key=lambda x: x[1], reverse=True)
     # debug: print generated moves
-    #for move in moves: print(move_to_string(move[0]), move[1], move[2], file=sys.stderr)
+    # for move in moves: print(move_to_string(move[0]), move[1], move[2], file=sys.stderr)
     return moves[0][0]
   return NONE
 
@@ -579,6 +579,7 @@ def gtp():
         print('=\n')
       else:
         side = (3-side)
+        ko = [NONE, NONE]
         print('=\n')
     elif 'genmove' in command:
       color = BLACK if command.split()[-1] == 'B' else WHITE
