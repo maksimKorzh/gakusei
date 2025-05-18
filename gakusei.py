@@ -45,29 +45,9 @@ patterns= [
     [STONE, STONE, EMPTY]   # ? ? .
   ],
   [
-    [STONE, EMPTY, STONE],  # ? . ?
-    [BLACK, EMPTY, BLACK],  # X . X  Peep
-    [EMPTY, SOLVE, EMPTY],  # . $ .
-  ],
-  [
-    [STONE, STONE, STONE],  # ? ? ?
-    [BLACK, SOLVE, BLACK],  # X $ X  Wedge
-    [STONE, WHITE, STONE]   # ? O ?
-  ],
-  [
-    [EMPTY, SOLVE, EMPTY],  # . $ .
-    [BLACK, WHITE, BLACK],  # X O X  Split
-    [EMPTY, WHITE, EMPTY]   # . O .
-  ],
-  [
     [STONE, EMPTY, EMPTY],  # ? . .
     [WHITE, SOLVE, EMPTY],  # O $ .
     [BLACK, WHITE, STONE]   # X O ?  Cut
-  ],
-  [
-    [EMPTY, WHITE, BLACK],  # . O X
-    [EMPTY, EMPTY, WHITE],  # . . O  Attack/Defend cut
-    [STONE, SOLVE, STONE]   # ? $ ?
   ],
   [
     [EMPTY, WHITE, BLACK],  # . O X
@@ -614,7 +594,7 @@ def gtp():
     elif 'genmove' in command:
       color = BLACK if command.split()[-1] == 'B' else WHITE
       for move in genmove(color): print(move_to_string(move[0]), move, file=sys.stderr)
-      best_score = negamax(7, float('-inf'), float('inf'))
+      best_score = negamax(8, float('-inf'), float('inf'))
       if best_move != NONE:
         play(best_move[0][0], best_move[0][1], color)
         print('= ' + move_to_string(best_move[0]) + '\n')
