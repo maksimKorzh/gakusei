@@ -7,6 +7,7 @@
 import sys
 import copy
 import random
+from copy import deepcopy
 
 # GLOBAL CONSTANTS
 NONE = -1                   # value of not initialized variable
@@ -24,28 +25,14 @@ board = [[]]                # board position, two dimensional array
 side = NONE                 # side to move, either BLACK or WHITE
 ko = [NONE, NONE]           # [col, row] Ko square, cannot set a stone on it
 groups = []                 # black and white groups database
+best_move = ()              # best move after search
 
 # PATTERN DATABASE          # "$" is SOLVE, "." is EMPTY, "X" = BLACK, "O" is WHITE, "?" is STONE, ~ is FENCE
 patterns= [
   [
-    [STONE, EMPTY, STONE],  # ? . ?
-    [BLACK, EMPTY, SOLVE],  # X . $  One space jump
-    [EMPTY, EMPTY, EMPTY]   # . . .
-  ],
-  [
-    [EMPTY, EMPTY, EMPTY],  # . ? .
-    [BLACK, EMPTY, STONE],  # X . ?  Knight's move
-    [EMPTY, EMPTY, SOLVE]   # . . $
-  ],
-  [
     [EMPTY, EMPTY, EMPTY],  # . . .
     [STONE, WHITE, SOLVE],  # ? O $  Block
     [EMPTY, STONE, BLACK],  # . ? X
-  ],
-  [
-    [EMPTY, STONE, EMPTY],  # . ? .
-    [STONE, BLACK, EMPTY],  # ? X .  Shoulder hit
-    [EMPTY, EMPTY, SOLVE],  # . . $
   ],
   [
     [EMPTY, EMPTY, EMPTY],  # . . .
@@ -79,8 +66,13 @@ patterns= [
   ],
   [
     [EMPTY, WHITE, BLACK],  # . O X
-    [EMPTY, EMPTY, WHITE],  # . . O  Defend cut
+    [EMPTY, EMPTY, WHITE],  # . . O  Attack/Defend cut
     [STONE, SOLVE, STONE]   # ? $ ?
+  ],
+  [
+    [EMPTY, WHITE, BLACK],  # . O X
+    [EMPTY, SOLVE, WHITE],  # . $ O  Cut
+    [STONE, BLACK, STONE]   # ? X ?
   ],
   [
     [FENCE, FENCE, FENCE],  # ~ ~ ~
@@ -303,14 +295,15 @@ def big_moves(color):
     for col in range(width):
       if board[row][col] == FENCE: continue
       if board[row][col] == EMPTY and (col, row) != ko and not is_suicide(col, row, color):
-        urgency = calculate_urgency('big_move', get_influence(col, row), (col, row)) + random.randint(0,5)
-        if (col, row) in [(4,4), (4,width-5), (width-5,4), (width-5,width-5)]: urgency += random.randint(11, 20)
+        urgency = calculate_urgency('big_move', get_influence(col, row), (col, row))
+        if (col, row) in [(4,4), (4,width-5), (width-5,4), (width-5,width-5)]: urgency += random.randint(16, 20)
         if (col, row) in [(4,width//2), (width//2,4), (width-5,width//2), (width//2,width-5)]: urgency += random.randint(1, 10)
         if row == 3 or row == (width-4) or col == 3 or col == (width-4): urgency += random.randint(5,15)
         if not is_atari(col, row, color):
           if not is_clover(col, row) != EMPTY:
             moves.append([(col, row), urgency, 'big_move'])
-  return moves
+  moves.sort(key=lambda x: x[1], reverse=True)
+  return [moves[0]]
 
 def rotate_pattern(pattern):
   '''
@@ -380,6 +373,8 @@ def match_pattern(color):
           if not is_atari(response[0], response[1], color):
             if not is_clover(response[0], response[1]):
               pattern_moves.append([response, urgency, 'pattern'])
+
+  pattern_moves.sort(key=lambda x: x[1])
   return pattern_moves
 
 def is_ladder(col, row, color, first_run):
@@ -424,10 +419,11 @@ def attack(group, color):
   Returns the best move to attack a given group
   '''
   moves = []
+  surround_moves = []
   if len(group['liberties'])== 1: # capture group
     if group['liberties'][0] != ko:
       urgency = calculate_urgency('capture', group, group['liberties'][0])
-      return [group['liberties'][0], urgency, 'capture']
+      moves.append([group['liberties'][0], urgency, 'capture'])
   if len(group['liberties']) == 2: # check ladder attack
     stone = group['stones'][0]
     move = check_ladder(stone[0], stone[1], (3-color))
@@ -435,63 +431,58 @@ def attack(group, color):
       if not is_suicide(move[0], move[1], color):
         if not is_atari(move[0], move[1], color):
           urgency = calculate_urgency('ladder', group, move)
-          return [move, urgency, 'ladder_attack']
-  if len(group['liberties']) >= 2: # surround group
-    for move in group['liberties']:
-      if not is_suicide(move[0], move[1], color):
-        urgency = calculate_urgency('surround', group, move)
-        if is_atari(move[0], move[1], color): continue
-        moves.append([move, urgency, 'surround'])
-    if len(moves):
-      moves.sort(key=lambda x: x[1])
-      return moves[0]
-  return NONE
+          moves.append([move, urgency, 'ladder_attack'])
+  if len(surround_moves):
+    surround_moves.sort(key=lambda x: x[1])
+    moves.append(surround_moves[0])
+  if len(moves):
+    moves.sort(key=lambda x: x[1])
+    return moves
+  return []
 
 def defend(group, color):
   '''
   Returns the best move to defend a given group
   '''
   moves = []
+  extend_moves = []
   urgency = int(len(group['stones']) / len(group['liberties']))
   if len(group['liberties'])== 1: # save group
     if not is_suicide(group['liberties'][0][0], group['liberties'][0][1], color):
       urgency = calculate_urgency('save', group, group['liberties'][0])
       stone = group['stones'][0]
-      ladder = check_ladder(stone[0], stone[1], color) # check if not trapped int a ladder
-      if not ladder: return [group['liberties'][0], urgency, 'save']
-  if len(group['liberties']) > 1: # extend group
-    for move in group['liberties']:
-      if not is_suicide(move[0], move[1], color):
-        if not is_clover(move[0], move[1]):
-          urgency = calculate_urgency('extend', group, move)
-          moves.append([move, urgency, 'extend'])
-    if len(moves):
-      moves.sort(key=lambda x: x[1], reverse=True)
-      return moves[0]
-  return NONE
+      ladder = check_ladder(stone[0], stone[1], color) # check if not trapped into a ladder
+      if not ladder: moves.append([group['liberties'][0], urgency, 'save'])
+  if len(extend_moves):
+    extend_moves.sort(key=lambda x: x[1])
+    moves.append(extend_moves[0])
+  if len(moves):
+    moves.sort(key=lambda x: x[1], reverse=True)
+    return moves
+  return []
 
 def calculate_urgency(move_type, group, move):
   '''
   Returns urgency value based on group size
   and amount of its liberties, move type and location
   '''
-  if move_type == 'big_move': return (width*20)+group
+  if move_type == 'big_move': return (width)+group
   elif move_type == 'pattern':
     center = (width // 4, width // 4)
     distance = abs(move[0] - center[0]) + abs(move[1] - center[1])
     weight = 0
     for row in group:
       for col in row: weight += col
-    return (width*21)-distance+5+weight*10
+    return (width*21)-distance+weight*4
   else:
     center = (width // 2, width // 2)
     distance = abs(move[0] - center[0]) + abs(move[1] - center[1])
     urgency = int(len(group['stones']) / len(group['liberties']))
     if move_type == 'capture': urgency += (width*37)
-    elif move_type == 'surround': urgency += ((width*20)+distance)
+    elif move_type == 'surround': urgency += ((width*18)+distance)
     elif move_type == 'ladder': urgency += (width*25)
     elif move_type == 'save': urgency += ((width*37)-distance)
-    elif move_type == 'extend': urgency += ((width*20)-distance)
+    elif move_type == 'extend': urgency += ((width*18)-distance)
     return urgency
 
 def genmove(color):
@@ -528,23 +519,62 @@ def genmove(color):
 
   # Generate attacking moves
   for group in groups[(3-color-1)]: # attack opponent's weakest group
-    move = attack(group, color)
-    if move != NONE and move not in moves:
-      moves.append(move)
+    for move in attack(group, color):
+      if move != NONE and move not in moves:
+        moves.append(move)
   
   # Generate defensive moves
   for group in groups[(color-1)]: # defend own weakest group
-    move = defend(group, color)
-    if move != NONE and move not in moves:
-      moves.append(move)
+    for move in defend(group, color):
+      if move != NONE and move not in moves:
+        moves.append(move)
   
   # Sort moves in place by urgency in descending order
   if len(moves):
     moves.sort(key=lambda x: x[1], reverse=True)
-    # debug: print generated moves
-    # for move in moves: print(move_to_string(move[0]), move[1], move[2], file=sys.stderr)
-    return moves[0][0]
+    return unique(moves)[:-1] if len(moves) > 1 else moves
   return NONE
+
+def unique(moves):
+  seen_tuples = set()
+  unique = []
+  for sublist in moves:
+    tuples_in_sublist = {item for item in sublist if isinstance(item, tuple)}
+    if tuples_in_sublist & seen_tuples: continue
+    seen_tuples.update(tuples_in_sublist)
+    unique.append(sublist)
+  return unique
+
+def negamax(depth, alpha, beta):
+  global board, groups, side, ko, best_move
+  if depth == 0: return evaluate()
+  old_alpha = alpha
+  best_temp = ()
+  for move in genmove(side):
+    old_board = deepcopy(board)
+    old_groups = deepcopy(groups)
+    old_side = side
+    old_ko = ko
+    if move != NONE: play(move[0][0], move[0][1], side)
+    score = -negamax(depth-1, -beta, -alpha)
+    board = old_board
+    groups = old_groups
+    side = old_side
+    ko = old_ko
+    if score > alpha:
+      if score >= beta: break
+      alpha = score
+      best_temp = move
+  if alpha != old_alpha: best_move = best_temp
+  return alpha
+
+def evaluate():
+  score = 0
+  for row in range(width):
+    for col in range(width):
+      if board[row][col] == BLACK: score += get_influence(col, row)
+      if board[row][col] == WHITE: score -= get_influence(col, row)
+  return score if side == BLACK else -score
 
 def move_to_string(move):
   '''
@@ -559,7 +589,7 @@ def gtp():
   '''
   Handles GTP communication between engine and GUI
   '''
-  global width, side
+  global width, side, best_move
   while True:
     command = input()
     if 'name' in command: print('= Gakusei\n')
@@ -583,10 +613,12 @@ def gtp():
         print('=\n')
     elif 'genmove' in command:
       color = BLACK if command.split()[-1] == 'B' else WHITE
-      best_move = genmove(color)
+      for move in genmove(color): print(move_to_string(move[0]), move, file=sys.stderr)
+      best_score = negamax(7, float('-inf'), float('inf'))
       if best_move != NONE:
-        play(best_move[0], best_move[1], color)
-        print('= ' + move_to_string(best_move) + '\n')
+        play(best_move[0][0], best_move[0][1], color)
+        print('= ' + move_to_string(best_move[0]) + '\n')
+        print('Best move:', best_move, '\tscore:', -best_score, file=sys.stderr)
       else: print('= pass\n')
     elif 'quit' in command: sys.exit()
     else: print('=\n') # skip currently unsupported commands
