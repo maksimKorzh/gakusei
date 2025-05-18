@@ -563,7 +563,7 @@ def gtp():
   while True:
     command = input()
     if 'name' in command: print('= Gakusei\n')
-    elif 'protocol_version' in command: print('= 1\n');
+    elif 'protocol_version' in command: print('= 2\n');
     elif 'version' in command: print('=', 'by Code Monkey King\n')
     elif 'list_commands' in command: print('= protocol_version\n')
     elif 'boardsize' in command: width = int(command.split()[1])+2; print('=\n')
