@@ -35,7 +35,7 @@ patterns= [
     [EMPTY, STONE, BLACK],  # . ? X
   ],
   [
-    [EMPTY, EMPTY, EMPTY],  # . . .
+    [EMPTY, EMPTY, STONE],  # . . ?
     [EMPTY, WHITE, STONE],  # . O ?  Hane
     [SOLVE, BLACK, STONE],  # $ X ?
   ],
@@ -286,9 +286,6 @@ def big_moves(color):
       if board[row][col] == FENCE: continue
       if board[row][col] == EMPTY and (col, row) != ko and not is_suicide(col, row, color):
         urgency = calculate_urgency('big_move', get_influence(col, row), (col, row))
-        #if (col, row) in [(4,4), (4,width-5), (width-5,4), (width-5,width-5)]: urgency += random.randint(16, 20)
-        #if (col, row) in [(4,width//2), (width//2,4), (width-5,width//2), (width//2,width-5)]: urgency += random.randint(1, 10)
-        #if row == 3 or row == (width-4) or col == 3 or col == (width-4): urgency += random.randint(5,15)
         if not is_atari(col, row, color):
           if not is_clover(col, row) != EMPTY:
             moves.append([(col, row), urgency, 'big_move'])
@@ -420,12 +417,9 @@ def attack(group, color):
     move = check_ladder(stone[0], stone[1], (3-color))
     if move:
       if not is_suicide(move[0], move[1], color):
-        #if not is_atari(move[0], move[1], color):
+        if not is_atari(move[0], move[1], color):
           urgency = calculate_urgency('ladder', group, move)
           moves.append([move, urgency, 'ladder_attack'])
-  if len(surround_moves):
-    surround_moves.sort(key=lambda x: x[1])
-    moves.append(surround_moves[0])
   if len(moves):
     moves.sort(key=lambda x: x[1])
     return moves
@@ -470,10 +464,8 @@ def calculate_urgency(move_type, group, move):
     distance = abs(move[0] - center[0]) + abs(move[1] - center[1])
     urgency = int(len(group['stones']) / len(group['liberties']))
     if move_type == 'capture': urgency += (width*37)
-    elif move_type == 'surround': urgency += ((width*18)+distance)
     elif move_type == 'ladder': urgency += (width*25)
     elif move_type == 'save': urgency += ((width*37)-distance)
-    elif move_type == 'extend': urgency += ((width*18)-distance)
     return urgency
 
 def genmove(color):
@@ -588,7 +580,7 @@ def evaluate():
     for col in range(width):
       if board[row][col] == BLACK: score += 1
       if board[row][col] == WHITE: score -= 1
-  return score if side == BLACK else -score-6.5
+  return score if side == BLACK else -score
 
 def search(command):
   '''
@@ -628,14 +620,6 @@ def gtp():
     elif 'boardsize' in command: width = int(command.split()[1])+2; print('=\n')
     elif 'clear_board' in command: init_board(); print('=\n')
     elif 'showboard' in command: print('= ', end=''); print_board()
-    elif 'search' in command:
-      for i in genmove(side): print(move_to_string(i[0]), file=sys.stderr)
-      print(root(8), file=sys.stderr)
-      print('= \n')
-    elif 'eval' in command:
-      print(evaluate(), file=sys.stderr)
-      print('= \n')
-
     elif 'play' in command:
       if 'pass'.upper() not in command:
         params = command.split()
