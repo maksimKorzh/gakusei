@@ -25,7 +25,7 @@ board = [[]]                # board position, two dimensional array
 side = NONE                 # side to move, either BLACK or WHITE
 ko = [NONE, NONE]           # [col, row] Ko square, cannot set a stone on it
 groups = []                 # black and white groups database
-best_move = ()              # best move after search
+best_move = NONE            # best move after search
 
 # PATTERN DATABASE          # "$" is SOLVE, "." is EMPTY, "X" = BLACK, "O" is WHITE, "?" is STONE, ~ is FENCE
 patterns= [
@@ -283,7 +283,8 @@ def big_moves(color):
           if not is_clover(col, row) != EMPTY:
             moves.append([(col, row), urgency, 'big_move'])
   moves.sort(key=lambda x: x[1], reverse=True)
-  return [moves[0]]
+  if len(moves): return [moves[0]]
+  else: return []
 
 def rotate_pattern(pattern):
   '''
@@ -513,7 +514,7 @@ def genmove(color):
   if len(moves):
     moves.sort(key=lambda x: x[1], reverse=True)
     return unique(moves)[:-1] if len(moves) > 1 else moves
-  return NONE
+  return []
 
 def unique(moves):
   seen_tuples = set()
@@ -530,22 +531,26 @@ def negamax(depth, alpha, beta):
   if depth == 0: return evaluate()
   old_alpha = alpha
   best_temp = ()
-  for move in genmove(side):
-    old_board = deepcopy(board)
-    old_groups = deepcopy(groups)
-    old_side = side
-    old_ko = ko
-    if move != NONE: play(move[0][0], move[0][1], side)
-    score = -negamax(depth-1, -beta, -alpha)
-    board = old_board
-    groups = old_groups
-    side = old_side
-    ko = old_ko
-    if score > alpha:
-      if score >= beta: break
-      alpha = score
-      best_temp = move
-  if alpha != old_alpha: best_move = best_temp
+  moves = genmove(side)
+  if len(moves):
+    for move in genmove(side):
+      old_board = deepcopy(board)
+      old_groups = deepcopy(groups)
+      old_side = side
+      old_ko = ko
+      if move != NONE: play(move[0][0], move[0][1], side)
+      score = -negamax(depth-1, -beta, -alpha)
+      board = old_board
+      groups = old_groups
+      side = old_side
+      ko = old_ko
+      if score > alpha:
+        if score >= beta: break
+        alpha = score
+        best_move = move
+  else:
+    best_move = NONE
+    print('generated moves:', moves, file=sys.stderr)
   return alpha
 
 def evaluate():
@@ -555,6 +560,19 @@ def evaluate():
       if board[row][col] == BLACK: score += get_influence(col, row)
       if board[row][col] == WHITE: score -= get_influence(col, row)
   return score if side == BLACK else -score
+
+def search(command):
+  color = BLACK if command.split()[-1].upper() == 'B' else WHITE
+  for move in genmove(color):
+    try: print(move_to_string(move[0]), move, file=sys.stderr)
+    except: pass
+  best_score = negamax(8, float('-inf'), float('inf'))
+  print('SCORE:', best_score, file=sys.stderr)
+  if best_move != NONE:
+    play(best_move[0][0], best_move[0][1], color)
+    print('= ' + move_to_string(best_move[0]) + '\n')
+    print('Best move:', move_to_string(best_move[0]), -best_score, best_move, file=sys.stderr)
+  else: print('= pass\n')
 
 def move_to_string(move):
   '''
@@ -591,15 +609,7 @@ def gtp():
         side = (3-side)
         ko = [NONE, NONE]
         print('=\n')
-    elif 'genmove' in command:
-      color = BLACK if command.split()[-1].upper() == 'B' else WHITE
-      for move in genmove(color): print(move_to_string(move[0]), move, file=sys.stderr)
-      best_score = negamax(8, float('-inf'), float('inf'))
-      if best_move != NONE:
-        play(best_move[0][0], best_move[0][1], color)
-        print('= ' + move_to_string(best_move[0]) + '\n')
-        print('Best move:', best_move, '\tscore:', -best_score, file=sys.stderr)
-      else: print('= pass\n')
+    elif 'genmove' in command: search(command)
     elif 'quit' in command: sys.exit()
     else: print('=\n') # skip currently unsupported commands
 
