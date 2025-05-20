@@ -46,18 +46,28 @@ patterns= [
   ],
   [
     [STONE, EMPTY, EMPTY],  # ? . .
-    [WHITE, SOLVE, EMPTY],  # O $ .
-    [BLACK, WHITE, STONE]   # X O ?  Cut
+    [WHITE, SOLVE, EMPTY],  # O $ .  Cut
+    [BLACK, WHITE, STONE]   # X O ?
   ],
   [
-    [EMPTY, WHITE, BLACK],  # . O X
-    [EMPTY, SOLVE, WHITE],  # . $ O  Cut
+    [STONE, STONE, STONE],  # ? ? ?
+    [STONE, SOLVE, WHITE],  # ? $ O  Wedge
     [STONE, BLACK, STONE]   # ? X ?
   ],
   [
     [FENCE, FENCE, FENCE],  # ~ ~ ~
-    [EMPTY, SOLVE, BLACK],  # . $ X  Yose
-    [EMPTY, WHITE, BLACK]   # . O X
+    [STONE, SOLVE, BLACK],  # ? $ X  Yose 1
+    [STONE, WHITE, BLACK]   # ? O X
+  ],
+  [
+    [FENCE, FENCE, FENCE],  # ~ ~ ~
+    [STONE, SOLVE, BLACK],  # ? $ X  Yose 2
+    [STONE, EMPTY, WHITE],  # ? ? O
+  ],
+  [
+    [FENCE, FENCE, FENCE],  # ~ ~ ~
+    [STONE, SOLVE, STONE],  # ? $ ?  Yose 3
+    [BLACK, WHITE, WHITE],  # X O O
   ]
 ]
 
@@ -276,9 +286,9 @@ def big_moves(color):
       if board[row][col] == FENCE: continue
       if board[row][col] == EMPTY and (col, row) != ko and not is_suicide(col, row, color):
         urgency = calculate_urgency('big_move', get_influence(col, row), (col, row))
-        if (col, row) in [(4,4), (4,width-5), (width-5,4), (width-5,width-5)]: urgency += random.randint(16, 20)
-        if (col, row) in [(4,width//2), (width//2,4), (width-5,width//2), (width//2,width-5)]: urgency += random.randint(1, 10)
-        if row == 3 or row == (width-4) or col == 3 or col == (width-4): urgency += random.randint(5,15)
+        #if (col, row) in [(4,4), (4,width-5), (width-5,4), (width-5,width-5)]: urgency += random.randint(16, 20)
+        #if (col, row) in [(4,width//2), (width//2,4), (width-5,width//2), (width//2,width-5)]: urgency += random.randint(1, 10)
+        #if row == 3 or row == (width-4) or col == 3 or col == (width-4): urgency += random.randint(5,15)
         if not is_atari(col, row, color):
           if not is_clover(col, row) != EMPTY:
             moves.append([(col, row), urgency, 'big_move'])
@@ -522,6 +532,7 @@ def root(depth, color):
   '''
   global board, groups, side, ko, best_move
   best_score = float('-inf')
+  temp_best = NONE
   moves = genmove(side)
   for move in moves:
     old_board = deepcopy(board)
@@ -530,14 +541,15 @@ def root(depth, color):
     old_ko = ko
     if move != NONE: play(move[0][0], move[0][1], side)
     score = -negamax(depth-1, float('-inf'), float('inf'))
+    print('>', move_to_string(move[0]), move, score, file=sys.stderr)
     board = old_board
     groups = old_groups
     side = old_side
     ko = old_ko
     if score > best_score:
       best_score = score
-      best_move = move
-  if not len(moves): best_move = NONE
+      temp_best = move
+  best_move = temp_best
   return best_score
 
 def negamax(depth, alpha, beta):
@@ -547,7 +559,6 @@ def negamax(depth, alpha, beta):
   global board, groups, side, ko, best_move
   if depth == 0: return evaluate()
   old_alpha = alpha
-  best_temp = ()
   moves = genmove(side)
   if len(moves):
     for move in genmove(side):
@@ -565,6 +576,7 @@ def negamax(depth, alpha, beta):
         if score >= beta: break
         alpha = score
         best_move = move
+  best_move = NONE
   return alpha
 
 def evaluate():
@@ -583,12 +595,14 @@ def search(command):
   Find and make best move
   '''
   color = BLACK if command.split()[-1].upper() == 'B' else WHITE
-  for move in genmove(color):
-    print('>', move_to_string(move[0]), file=sys.stderr)
-  best_score = root(15, color)
+  moves = [move_to_string(m[0]) for m in genmove(color)]
+  best_score = root(10, color)
   if best_move != NONE:
     play(best_move[0][0], best_move[0][1], color)
     print('= ' + move_to_string(best_move[0]) + '\n')
+    if move_to_string(best_move[0]) not in moves:
+      print('ERROR MOVE', file=sys.stderr)
+      sys.exit(1)
   else: print('= pass\n')
 
 def move_to_string(move):
