@@ -92,7 +92,7 @@ def print_board():
       else: print(['.', 'X', 'O', '#'][board[row][col]], end=' ')
     if row < width-1: print()
   print('   ', 'A B C D E F G H J K L M N O P Q R S T'[:width*2-4])
-  print('\n    Side to move:', ('BLACK' if side == 1 else 'WHITE'))
+  print('\n    Side to move:', ('BLACK' if side == 1 else 'WHITE'), file=sys.stderr)
   print()
 
 def print_groups():
@@ -468,21 +468,8 @@ def calculate_urgency(move_type, group, move):
 
 def genmove(color):
   '''
-  Returns the best move to be played by the given
-  color, considering the following heuristics:
-
-  1. TAKE BIG POINT
-  2. MATCH PATTERNS
-  3. ATTACK OPPONENT'S WEAKEST GROUP
-  4. DEFEND OWN WEAKEST GROUP
-
-  Each move gets assigned the value of its "urgency".
-  Big moves and pattern matches are balanced with
-  attack/defense actions. For a contact play "urgency"
-  is calculated via dividing the number of stones by the
-  amount of liberties, the higher value we have the more
-  urgent a given move is. Eventually a move with the biggest
-  urgency is considered to be the best.
+  Returns list of moves sorted by its "urgency", it's
+  used for move ordering within alpha beta search.
   '''
   
   update_groups()
@@ -517,6 +504,9 @@ def genmove(color):
   return []
 
 def unique(moves):
+  '''
+  Filters duplicate moves
+  '''
   seen_tuples = set()
   unique = []
   for sublist in moves:
@@ -526,7 +516,36 @@ def unique(moves):
     unique.append(sublist)
   return unique
 
+def root(depth):
+  '''
+  Root moves search
+  '''
+  global board, groups, side, ko, best_move
+  best_score = float('-inf')
+  moves = genmove(side)
+  print('TOTAL:', len(moves), file=sys.stderr)
+  for move in moves:
+    old_board = deepcopy(board)
+    old_groups = deepcopy(groups)
+    old_side = side
+    old_ko = ko
+    if move != NONE: play(move[0][0], move[0][1], side)
+    score = -negamax(depth-1, float('-inf'), float('inf'))
+    board = old_board
+    groups = old_groups
+    side = old_side
+    ko = old_ko
+    print('>', move_to_string(move[0]), str(score), str(move), file=sys.stderr)
+    if score > best_score:
+      best_score = score
+      best_move = move
+  if not len(moves): best_move = NONE
+  return best_score
+
 def negamax(depth, alpha, beta):
+  '''
+  Recursive alpha beta search
+  '''
   global board, groups, side, ko, best_move
   if depth == 0: return evaluate()
   old_alpha = alpha
@@ -548,35 +567,33 @@ def negamax(depth, alpha, beta):
         if score >= beta: break
         alpha = score
         best_move = move
-  else:
-    best_move = NONE
-    print('generated moves:', moves, file=sys.stderr)
   return alpha
 
 def evaluate():
+  '''
+  Score position based on resulting influence
+  '''
   score = 0
   for row in range(width):
     for col in range(width):
       if board[row][col] == BLACK: score += get_influence(col, row)
       if board[row][col] == WHITE: score -= get_influence(col, row)
-  return score if side == BLACK else -score
+  return score if side == BLACK else -score-0.5 # komi like value
 
 def search(command):
+  '''
+  Find and make best move
+  '''
   color = BLACK if command.split()[-1].upper() == 'B' else WHITE
-  for move in genmove(color):
-    try: print(move_to_string(move[0]), move, file=sys.stderr)
-    except: pass
-  best_score = negamax(8, float('-inf'), float('inf'))
-  print('SCORE:', best_score, file=sys.stderr)
+  best_score = root(8)
   if best_move != NONE:
     play(best_move[0][0], best_move[0][1], color)
     print('= ' + move_to_string(best_move[0]) + '\n')
-    print('Best move:', move_to_string(best_move[0]), -best_score, best_move, file=sys.stderr)
   else: print('= pass\n')
 
 def move_to_string(move):
   '''
-  Converts move (col, row) to algebraic notation
+  Convert move coords to algebraic notation
   '''
   global width
   col = chr(move[0]-(1 if move[0]<=8 else 0)+ord('A'))
@@ -585,7 +602,7 @@ def move_to_string(move):
 
 def gtp():
   '''
-  Handles GTP communication between engine and GUI
+  Go Text Protocol command loop
   '''
   global width, side, best_move
   while True:
@@ -596,9 +613,9 @@ def gtp():
     elif 'list_commands' in command: print('= protocol_version\n')
     elif 'boardsize' in command: width = int(command.split()[1])+2; print('=\n')
     elif 'clear_board' in command: init_board(); print('=\n')
-    elif 'showboard' in command: print('= Internal board:', end=''); print_board()
+    elif 'showboard' in command: print('= ', end=''); print_board()
     elif 'play' in command:
-      if 'pass' not in command:
+      if 'pass'.upper() not in command:
         params = command.split()
         color = BLACK if params[1] == 'B' else WHITE
         col = ord(params[2][0])-ord('A')+(1 if ord(params[2][0]) <= ord('H') else 0)
