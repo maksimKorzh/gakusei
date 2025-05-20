@@ -592,7 +592,7 @@ def gtp():
         ko = [NONE, NONE]
         print('=\n')
     elif 'genmove' in command:
-      color = BLACK if command.split()[-1] == 'B' else WHITE
+      color = BLACK if command.split()[-1].upper() == 'B' else WHITE
       for move in genmove(color): print(move_to_string(move[0]), move, file=sys.stderr)
       best_score = negamax(8, float('-inf'), float('inf'))
       if best_move != NONE:
