@@ -534,6 +534,7 @@ def root(depth, color):
     groups = old_groups
     side = old_side
     ko = old_ko
+    print('>', move_to_string(move[0]), str(score), str(move), file=sys.stderr)
     if score > best_score:
       best_score = score
       best_move = move
@@ -576,15 +577,13 @@ def evaluate():
     for col in range(width):
       if board[row][col] == BLACK: score += 1
       if board[row][col] == WHITE: score -= 1
-  return score if side == BLACK else -score-6.5
+  return score if side == BLACK else -score
 
 def search(command):
   '''
   Find and make best move
   '''
   color = BLACK if command.split()[-1].upper() == 'B' else WHITE
-  for move in genmove(color):
-    print('>', move_to_string(move[0]), file=sys.stderr)
   best_score = root(15, color)
   if best_move != NONE:
     play(best_move[0][0], best_move[0][1], color)
@@ -616,7 +615,7 @@ def gtp():
     elif 'showboard' in command: print('= ', end=''); print_board()
     elif 'search' in command:
       for i in genmove(side): print(move_to_string(i[0]), file=sys.stderr)
-      print(root(8), file=sys.stderr)
+      print(root(10), file=sys.stderr)
       print('= \n')
     elif 'eval' in command:
       print(evaluate(), file=sys.stderr)
