@@ -286,6 +286,9 @@ def big_moves(color):
       if board[row][col] == FENCE: continue
       if board[row][col] == EMPTY and (col, row) != ko and not is_suicide(col, row, color):
         urgency = calculate_urgency('big_move', get_influence(col, row), (col, row))
+        if (col, row) in [(4,4), (4,width-5), (width-5,4), (width-5,width-5)]: urgency += 20
+        if (col, row) in [(4,width//2), (width//2,4), (width-5,width//2), (width//2,width-5)]: urgency += 10
+        if row == 3 or row == (width-4) or col == 3 or col == (width-4): urgency += 5
         if not is_atari(col, row, color):
           if not is_clover(col, row) != EMPTY:
             moves.append([(col, row), urgency, 'big_move'])
@@ -591,7 +594,7 @@ def search(command):
   '''
   color = BLACK if command.split()[-1].upper() == 'B' else WHITE
   moves = [move_to_string(m[0]) for m in genmove(color)]
-  best_score = root(11, color)
+  best_score = root(5, color)
   if best_move != NONE:
     play(best_move[0][0], best_move[0][1], color)
     print('= ' + move_to_string(best_move[0]) + '\n')
