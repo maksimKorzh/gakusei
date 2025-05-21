@@ -523,7 +523,7 @@ def root(depth, color):
   Root moves search
   '''
   global board, groups, side, ko, best_move
-  best_score = float('-inf')
+  best_score = -10000
   temp_best = NONE
   moves = genmove(side)
   for move in moves:
@@ -532,8 +532,8 @@ def root(depth, color):
     old_side = side
     old_ko = ko
     if move != NONE: play(move[0][0], move[0][1], side)
-    score = -negamax(depth-1, float('-inf'), float('inf'))
-    print('>', move_to_string(move[0]), move, score, file=sys.stderr)
+    score = -negamax(depth-1, -10000, 10000)
+    print('>', move_to_string(move[0]), move, -score if side == BLACK else score, file=sys.stderr)
     board = old_board
     groups = old_groups
     side = old_side
@@ -549,8 +549,11 @@ def negamax(depth, alpha, beta):
   Recursive alpha beta search
   '''
   global board, groups, side, ko, best_move
-  if depth == 0: return evaluate()
-  old_alpha = alpha
+  if depth == 0:
+    score = evaluate()
+    #print_board()
+    #print(score)
+    return score
   moves = genmove(side)
   if len(moves):
     for move in genmove(side):
@@ -578,8 +581,8 @@ def evaluate():
   score = 0
   for row in range(width):
     for col in range(width):
-      if board[row][col] == BLACK: score += 1
-      if board[row][col] == WHITE: score -= 1
+      if board[row][col] == BLACK: score += 60 + get_influence(col, row)
+      if board[row][col] == WHITE: score -= 60 - get_influence(col, row)
   return score if side == BLACK else -score
 
 def search(command):
@@ -588,7 +591,7 @@ def search(command):
   '''
   color = BLACK if command.split()[-1].upper() == 'B' else WHITE
   moves = [move_to_string(m[0]) for m in genmove(color)]
-  best_score = root(10, color)
+  best_score = root(11, color)
   if best_move != NONE:
     play(best_move[0][0], best_move[0][1], color)
     print('= ' + move_to_string(best_move[0]) + '\n')
