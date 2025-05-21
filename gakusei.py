@@ -485,11 +485,6 @@ def genmove(color):
     if move not in moves:
       moves.append(move)
 
-  # Generate pattern matches
-  for move in match_pattern(color):
-    if move not in moves:
-      moves.append(move)
-
   # Generate attacking moves
   for group in groups[(3-color-1)]: # attack opponent's weakest group
     for move in attack(group, color):
@@ -501,6 +496,11 @@ def genmove(color):
     for move in defend(group, color):
       if move != NONE and move not in moves:
         moves.append(move)
+  
+  # Generate pattern matches
+  for move in match_pattern(color):
+    if move not in moves:
+      moves.append(move)
   
   # Sort moves in place by urgency in descending order
   if len(moves):
